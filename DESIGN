@@ -1,0 +1,70 @@
+instruction format
+------------
+definition:
+    {instruction name} {sec} {arguments}
+
+example:
+    moveto 354 123.45 234.56
+
+This means send a "moveto" instruction 354 seconds after the game start. (123.45, 234.56) is 
+the destination.
+
+ShipInfo raw format
+--------------
+definition:
+    ShipInfo {attribute number}
+        {attribute name} {value}
+        {attribute name} {value}
+        ...
+        {attribute name} {value}
+
+example:
+    ShipInfo 5
+        Armor 1000
+        PositinX 32.5
+        PositinY 43
+        isMoving True
+        CooldownRemain 2.3 1.0
+
+ResourceInfo raw format
+----------------
+Same as ShipInfo
+
+OSInterface raw format
+-----------------
+example:
+    OSInterface 4
+        Faction 2
+        Running True
+        Resource 4
+            ResourceInfo 3
+                Faction 2
+                PositinX 100.00
+                PositinY 100.00
+            ...
+            ResourceInfo 3
+                Faction 2
+                PositinX 100.00
+                PositinY 100.00
+        Ship 9
+            ShipInfo 8
+                ....
+                ..
+            ShipInfo 8
+                ....
+                ..
+            ...
+
+
+Game logic
+-------------
+
+while no one win:
+    t1 = time of the nearest event
+    dt0 = t1 - t
+    step by time 'dt0' until 
+            some event happen(hit something is an event) -> stepped time 'dt' actually
+    t += dt
+    handle all event before t
+    judge if some win
+

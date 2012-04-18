@@ -1,0 +1,16 @@
+Port = 55000
+MaxInstPerSec = 10
+MaxArmor = 1000.
+Acceleration = 10.
+MaxSpeed = 25
+AngularRate = 60
+ShipBoundingRadius = 15.
+IslandBoundingRadius = 32.
+CannonSpan = 4.
+CannonAngle = 90
+CannonRange = 250
+ResourceRestoreRate = [0., 5., 10., 15., 25., 50.]
+ResourceRadius = 196.
+MapWidth = 2048
+MapHeight = 2048
+RangeOfView = 400.
