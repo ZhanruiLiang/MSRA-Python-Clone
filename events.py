@@ -24,3 +24,5 @@ class ObjHit(GameEvent):
         self.time = time
         self.obj1 = obj1
         self.obj2 = obj2
+    def __repr__(self):
+        return 'ObjHit(%s, %s)' % (self.obj1, self.obj2)

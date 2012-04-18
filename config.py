@@ -1,8 +1,8 @@
 Port = 55000
 MaxInstPerSec = 10
 MaxArmor = 1000.
-Acceleration = 10.
-MaxSpeed = 25
+Acceleration = 100. # 10
+MaxSpeed = 250 # 25
 AngularRate = 60
 ShipBoundingRadius = 15.
 IslandBoundingRadius = 32.

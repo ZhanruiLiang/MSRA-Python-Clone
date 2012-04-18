@@ -9,6 +9,7 @@ from resource import Resource, ResourceInfo
 from vec2d import Vec2d
 from viewBox import ViewBox
 from viewControl import ViewControl
+from heapq import heappush, heappop
 
 
 class Instruction:
@@ -47,6 +48,8 @@ class Shippo:
         self.currentSec = 0
         self.running = False
 
+        self.blockings = []
+
     def add_player(self, player):
         dash = dashboard.ShipStatus(player)
         i = len(self.players)
@@ -70,7 +73,6 @@ class Shippo:
 
     #TODO: other instructions
 
-
     def render(self):
         screen = self.screen
         # draw the sea
@@ -81,11 +83,9 @@ class Shippo:
         # draw the ships
         sprites = self.resources + self.ships
         for sp in sprites:
-            sp.update(self.viewBox)
-            screen.blit(sp.image, sp.rect)
-        # for sp in self.resources:
-        #     if self.viewBox.inside(sp.position, config.ResourceRadius):
-        #         sp
+            if self.viewBox.inside(sp):
+                sp.update(self.viewBox)
+                screen.blit(sp.image, sp.rect)
         # draw dashBoards
         for dash in self.dashBoards:
             dash.update()
@@ -128,7 +128,7 @@ class Shippo:
 
     def setup_level(self, level=0):
 
-        p0 = Vec2d(50, 900)
+        p0 = Vec2d(250, 900)
         p1 = Vec2d(config.MapWidth - p0.x, p0.y)
         p2 = Vec2d(600, 600)
         p3 = Vec2d(config.MapWidth - p2.x, config.MapHeight - p2.y)
@@ -142,8 +142,23 @@ class Shippo:
             resource = Resource(id, pos)
             id += 1
             self.resources.append(resource)
-        # TODO add ships
-        # for pos in level0['sPoss1'
+        # add ship for player 1
+        id = 1
+        player = self.players[0]
+        for pos in level0['sPoss1']:
+            ship = Ship(id, 1, pos)
+            ship.moving = 1
+            player.ships.append(ship)
+            self.ships.append(ship)
+            id += 1
+        # add ship for player 2
+        player = self.players[1]
+        for pos in level0['sPoss2']:
+            ship = Ship(id, 2, pos)
+            ship.direction.rotate(180)
+            player.ships.append(ship)
+            self.ships.append(ship)
+            id += 1
 
         # add view controller
         self.viewControl = ViewControl(self)
@@ -154,25 +169,33 @@ class Shippo:
         self.t = t
         instTAccu = 0.
         renderTAccu = 0.
+        eventTAccu = 0.
         self.running = True
 
         renderDt = 1.0/self.FPS
         instDt = 1.0/config.MaxInstPerSec 
+        eventDt = 1.0/self.FPS
+        logicDt = 1.0/self.LFPS
+
         timer = pygame.time.Clock()
         timer1 = pygame.time.Clock()
         self.currentSec = 0
         while not self.needQuit:
             self.currentSec = int(t)
             timer1.tick()
-            for event in pygame.event.get():
-                if event.type == QUIT:
-                    self.quit()
-                    break
-                else:
-                    # TODO
-                    pass
-                self.viewControl.handle(event)
-            if self.needQuit: break
+            if eventTAccu >= eventDt:
+                eventTAccu -= eventDt
+                for event in pygame.event.get():
+                    if event.type == QUIT:
+                        self.quit()
+                        break
+                    else:
+                        # TODO: add other event handle
+                        pass
+                    self.viewControl.handle(event)
+                if self.needQuit: break
+                # make view controller alive
+                self.viewControl.step()
 
             # handle instructions
             if instTAccu >= instDt:
@@ -190,10 +213,9 @@ class Shippo:
                         self.apply(inst)
                         done = True
 
-            # make view controller alive
-            self.viewControl.step()
             # game logic
-            dt = timer1.tick()
+            dt = logicDt - timer1.tick()
+            # TODO: uncomment this
             self.step(dt)
             # render
             if renderTAccu >= renderDt:
@@ -202,11 +224,12 @@ class Shippo:
             dt = timer.tick(self.LFPS)
             instTAccu += dt
             renderTAccu += dt
+            eventTAccu += dt
             t += dt
             self.t = t
 
     def add_event(self, e):
-        heappush(self.event, e)
+        heappush(self.events, e)
 
     def phy_step(self, dt0):
         dtl, dtr = 0.005, dt0
@@ -227,7 +250,13 @@ class Shippo:
         return t
 
     def handle_event(self, event):
-        pass
+        if isinstance(event, ObjHit):
+            obj1 = event.obj1
+            obj2 = event.obj2
+            obj1.velocity *= 0
+            obj1.blocked = 1
+            if isinstance(obj2, Ship):
+                obj1.velocity *= 0
 
     def hittest(self, obj1, obj2):
         dp = obj2.position - obj1.position
@@ -241,11 +270,13 @@ class Shippo:
         ss = self.ships
         for i in xrange(n):
             for j in xrange(i+1, n):
-                if self.hittest(ss[i], ss[j]):
-                    return True
+                if (ss[i], ss[j]) not in self.blockings:
+                    if self.hittest(ss[i], ss[j]):
+                        return True
             for r in self.resources:
-                if self.hittest(ss[i], r):
-                    return True
+                if (ss[i], r) not in self.blockings:
+                    if self.hittest(ss[i], r):
+                        return True
         return False
 
     def step(self, dt0):
@@ -260,17 +291,23 @@ class Shippo:
             if self.exist_hit():
                 for ship in self.ships:
                     for ship1 in self.ships:
-                        if ship != ship1:
+                        if ship != ship1 and (ship, ship1) not in self.blockings:
                             if self.hittest(ship, ship1):
                                 hitEvent = ObjHit(self.t + t, ship, ship1)
+                                self.blockings.append((ship, ship1))
                                 self.add_event(hitEvent)
                     for resource in self.resources:
-                        if self.hittest(ship, resource):
+                        if self.hittest(ship, resource) and (ship, resource) not in self.blockings:
                             hitEvent = ObjHit(self.t + t, ship, resource)
+                            self.blockings.append((ship, resource))
                             self.add_event(hitEvent)
+            self.blockings = [(obj1, obj2) for obj1, obj2 in self.blockings 
+                    if self.hittest(obj1, obj2)]
+            # print 'Blocking', self.blockings
+            # print events
 
             while events:
-                e = heappop(events)
-                self.handle_event(e)
                 if events[0].time > self.t + t:
                     break
+                e = heappop(events)
+                self.handle_event(e)

@@ -49,5 +49,8 @@ class Resource(pygame.sprite.Sprite):
         pygame.draw.circle(self.image, self.IslandColor, (r1, r1), r2)
         pygame.draw.circle(self.image, self.BoundingColor, (r1, r1), r1, dr)
 
+    def test_world_size(self):
+        return (config.IslandBoundingRadius*2,)*2
+
     def __repr__(self):
         return 'Resource(%s, %s)' %(self.id, self.position)

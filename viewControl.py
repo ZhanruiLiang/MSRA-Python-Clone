@@ -31,9 +31,9 @@ class ViewControl:
             ds = 0.05
             if event.button == 4: 
                 # scroll up, zoom in
-                ds = ds
-            elif event.button == 5:
                 ds = -ds
+            elif event.button == 5:
+                ds = ds
             self.shippo.viewBox.zoom(event.pos, ds)
         self.buttons[4].bind(Button.Scroll, scroll)
         # self.buttons[4].bind(Button.Press, lambda event:self.shippo.viewBox.zoom(event.pos, 0))

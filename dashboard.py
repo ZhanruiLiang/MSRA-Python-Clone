@@ -20,7 +20,7 @@ class ShipStatus(SubBoard):
     margin = 5
     titleWidth = 80
     titleHeight = 18
-    barWidth = 40
+    barWidth = 20
     barHeight = 100
     barMargin = 10
     dotR = 10
@@ -40,7 +40,6 @@ class ShipStatus(SubBoard):
         margin = self.margin
         self.clearRect = pygame.Rect((margin, margin), 
                 (self.size[0]-2*margin, self.size[1]-2*margin))
-        print self.clearRect
         pygame.draw.rect(self.image, self.bgColor, self.clearRect)
 
         self.write((self.margin, self.margin), player.name)
@@ -54,8 +53,6 @@ class ShipStatus(SubBoard):
         self.clearRect = pygame.Rect((self.p0x, self.p0y),
                 (size[0] - self.p0x - 2*margin, size[1] - self.p0y - 2* margin))
                 # ((self.barWidth + self.barMargin)*5 + 2, self.barHeight + self.titleHeight * 3 + 2))
-        print self.clearRect
-
 
     def write(self, pos, s):
         self.image.blit(font.render(s, 1, self.fontColor), pos)
@@ -65,18 +62,28 @@ class ShipStatus(SubBoard):
         ships = player.ships
         # clear
         pygame.draw.rect(self.image, self.bgColor, self.clearRect)
-        x, y = self.p0x, self.p0y
         draw = pygame.draw
         barWidth, barHeight = self.barWidth, self.barHeight
 
+        # draw bar
+        x, y = self.p0x, self.p0y
         for ship in ships:
-            draw.rect(self.barColor0, pygame.Rect((x, y), (barWidth, barHeight)))
+            draw.rect(self.image, self.barColor0, pygame.Rect((x, y), (barWidth, barHeight)))
             h1 = barHeight * ship.armor / config.MaxArmor
-            draw.rect(self.barColor1, 
+            draw.rect(self.image, self.barColor1, 
                     pygame.Rect((x, y + barHeight - h1), (barWidth, h1)))
-            x, y = (x + self.barMargin, y)
+            x, y = (x + self.barWidth + self.barMargin, y)
         # draw dots
-        # TODO
+        r1 = self.barWidth / 2
+        r2 = r1 / 2
+        x, y = self.p1x + r1, self.p1y + r1
+        colors = (self.dotColor0, self.dotColor1)
+        for ship in ships:
+            y0, y1, y2 = y, y + r1 * 2, y + r1 * 4
+            draw.circle(self.image, colors[int(ship.isMoving)], (x, y0), r2)
+            draw.circle(self.image, colors[int(ship.isBlocked)], (x, y1), r2)
+            draw.circle(self.image, colors[int(ship.isRotating)], (x, y2), r2)
+            x += r1 * 2 + self.barMargin
 
 class DashBoard:
     def __init__(self, xy, size):

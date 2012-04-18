@@ -13,7 +13,6 @@ class Player:
         self.isConnected = False
         self.instructions = []
 
-        #TODO: init socket
         server = Socket(socket.AF_INET, socket.SOCK_STREAM)
         server.bind(('', port))
         server.listen(1)
