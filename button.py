@@ -6,13 +6,19 @@ pygame.font.init()
 font = pygame.font.SysFont('monospace', 16)
 Transparent = (0, 0, 0, 0)
 
-class Button(Sprite):
+class PyeventHandler:
+    def handle(self):
+        pass
+    def step(sefl):
+        pass
+
+class Button(Sprite, PyeventHandler):
     Press, Over, Release, Out, Scroll = 0, 1, 2, 3, 5
     AcceptEventTypes = [pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP]
     BgColor = (0, 0, 0, 0x55)
 
     def __init__(self, rect, caption, visible=0):
-        self.rect = Rect(rect)
+        self.rect = rect
         self.visible = visible
         self.enable = True
         self.callbacks = {}
@@ -27,6 +33,11 @@ class Button(Sprite):
         self._mouseOver = 0
 
     def bind(self, eventType, callback):
+        """ 
+The `eventType` can be one of 
+(Button.Press, Button,Over, Button.Release, Button.Out, Button.Scroll).
+The `callback` is a function with prototype callback(event).
+"""
         calllist = self.callbacks.get(eventType, [])
         calllist.append(callback)
         self.callbacks[eventType] = calllist
@@ -38,9 +49,10 @@ class Button(Sprite):
         if not self.rect.collidepoint(event.pos):
             if self._mouseOver == 1 and pet == pygame.MOUSEMOTION:
                 self._mouseOver = 0
-            for callback in self.callbacks.get(self.Out, []):
-                callback(event)
+                for callback in self.callbacks.get(self.Out, []):
+                    callback(event)
             return False
+        # event.pos in rect
         et = None
         if pet == pygame.MOUSEBUTTONDOWN:
             if event.button < 4:

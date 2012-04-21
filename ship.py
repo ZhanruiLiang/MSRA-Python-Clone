@@ -2,8 +2,18 @@ from vec2d import Vec2d
 from pygame.sprite import Sprite
 import pygame
 import config
+from button import Button
 
 Transparent = (0, 0, 0, 0)
+
+def rotate_chop(image, angle):
+    # import pdb; pdb.set_trace()
+    rect1 = image.get_rect()
+    image1 = pygame.transform.rotate(image, angle)
+    rect1.center = image1.get_rect().center
+    image.fill(Transparent)
+    image.blit(image1, (0, 0), rect1)
+    return image
 
 class ShipInfo:
     def __init__(self, ship):
@@ -35,6 +45,7 @@ class ShipInfo:
 class Ship(Sprite):
     color = (0, 0, 0x50, 0xff)
     FanColor = (0, 0, 0, 0xff)
+    ImgRadius = config.ShipBoundingRadius * 2
     def __init__(self, id, faction, pos, **args):
         self.faction = faction
         self.id = id
@@ -43,36 +54,50 @@ class Ship(Sprite):
         self.direction = Vec2d(1, 0)
         self.armor = config.MaxArmor
         self.hitRadius = config.ShipBoundingRadius
-        self.moving = 0
-        self.blocked = 0
 
         for arg in args:
             setattr(self, arg, args[arg])
 
         self.cooldowns = [0., 0.]
 
+        self.moving = 0
+        self.rotating = 0
+        self.blocked = 0
         self.moveTarget = None
         self.attackTarget = None
+        # rotateTarget is a float or a tuple (float, float)
+        self.rotateTarget = None
 
-        self.rect = pygame.Rect((0, 0), (2*config.ShipBoundingRadius,)*2)
+        self.rect = pygame.Rect((0, 0), (2*self.ImgRadius,)*2)
         self.image = pygame.Surface(self.rect.size).convert_alpha()
         self.rect.center = self.position
 
         self._lastScale = None
         self._lastAngle = self.direction.angle
 
+        # add button
+        self.button = Button(pygame.Rect((0,0), (1,1)), '', 0)
+
+    def __hash__(self):
+        return self.id
+
     def __repr__(self):
         return 'Ship(id=%s, %s)' % (self.id, self.position)
 
     def draw_body(self, viewBox):
-        R = viewBox.lenWorld2screen(self.hitRadius)
+        R = viewBox.lenWorld2screen(self.ImgRadius)
         p0x, p0y = (R, R)
         downPart = [(-R+2, R/8), (-R/4, R/4), (R/3, R/3), (R - 2, R/6)]
         upPart = [(x, -y) for x, y in downPart][::-1]
         poly = [(p0x + x, p0y + y) for x, y in downPart + upPart]
+        R = int(R)
+        r0 = int(config.ShipBoundingRadius)
+        self.image.fill(Transparent)
+        # pygame.draw.circle(self.image, (0x0, 0, 0xff, 0xff), (R, R), int(viewBox.lenWorld2screen(r0)), 
+        #         max(int(viewBox.lenWorld2screen(3)), 1))
+        pygame.draw.circle(self.image, (0x0, 0, 0xff, 0x8f), (R, R), int(viewBox.lenWorld2screen(r0)))
         pygame.draw.polygon(self.image, self.color, poly)
         pygame.draw.rect(self.image, self.FanColor, pygame.Rect((R, 0), (viewBox.lenWorld2screen(5), R*2)))
-        pygame.draw.circle(self.image, (0xff, 0, 0, 0xff), (int(R), int(R)), int(R), 1)
 
     @property
     def isMoving(self):
@@ -84,38 +109,107 @@ class Ship(Sprite):
 
     @property
     def isRotating(self):
-        return False
+        return self.rotating
 
     @property
     def cooldownRemain(self):
         return self.cooldowns
 
     def update(self, viewBox):
+        # if scale change then redraw
+        redrawwed = 0
         if self._lastScale != viewBox.scale:
-            r = viewBox.lenWorld2screen(self.hitRadius)
+            r = viewBox.lenWorld2screen(self.ImgRadius)
             self.rect = pygame.Rect((0, 0), (r*2,)*2)
             self.image = pygame.Surface(self.rect.size).convert_alpha()
-            self.image.fill(Transparent)
             self.draw_body(viewBox)
             self._lastScale = viewBox.scale
             self._lastAngle = 0
+            redrawwed = 1
         self.rect.center = viewBox.posWorld2screen(self.position)
         angle = self.direction.angle
-        if self._lastAngle != angle:
-            self.image = pygame.transform.rotate(self.image, angle - self._lastAngle)
+        # if rotated then transform
+        if abs(self._lastAngle - angle) >= 5:
+            if not redrawwed:
+                self.draw_body(viewBox)
+                redrawwed = 1
+            self.image = rotate_chop(self.image, -angle)
             self._lastAngle = angle
+
+        # update button
+        self.button.rect.center = self.rect.center
+        w = max(viewBox.lenWorld2screen(self.hitRadius+5)*2, 10)
+        self.button.rect.size = (w, w);
 
     def test_world_size(self):
         return (self.hitRadius*2,)*2
 
+    def short_step(self, dt):
+        a = config.Acceleration
+        v0 = self.velocity + (0, 0)
+        if self.moving:
+            self.velocity += self.direction * a * dt
+        else:
+            dv = -self.velocity.normalized() * config.StopDeccelarate * dt
+            if dv.length >= self.velocity.length:
+                self.velocity *= 0
+            else:
+                self.velocity += dv
+        if not self.blocked:
+            self.position += (self.velocity + v0) * dt
+
     def step(self, dt):
         a = config.Acceleration
-        if dt > 0:
-            self.position += self.velocity * dt
-            if self.moving and not self.blocked and self.velocity.length < config.MaxSpeed:
-                self.velocity += self.direction * a * dt
-        else:
-            self.position += self.velocity * dt
-            if self.moving and not self.blocked and self.velocity.length < config.MaxSpeed:
-                self.velocity += self.direction * a * dt
+        v0 = self.velocity + (0, 0)
+        if self.moveTarget is not None:
+            dp = self.moveTarget - self.position
+            angle = dp.angle
+            myAngle = self.direction.angle
+            if dp.length < config.StopRange:
+                self.moveTarget = None
+                self.moving = False
+
+            da = angle - myAngle
+            if da > 180: da -= 360
+            elif da < -180: da += 360
+            if abs(da) <= dt * config.AngularRate:
+                self.direction.rotate(da)
+                self.velocity.rotate(da)
+                self.rotating = False
+            elif da:
+                da = da/abs(da) * config.AngularRate * dt
+                self.direction.rotate(da)
+                self.velocity.rotate(da)
+        elif self.rotateTarget is not None:
+            myAngle = self.direction.angle
+            if isinstance(self.rotateTarget, float):
+                da = self.rotateTarget - myAngle
+            else:
+                da = Vec2d(self.rotateTarget - self.position).angle - myAngle
+
+            if da > 180: da -= 360
+            elif da < -180: da += 360
+
+            if abs(da) <= dt * config.AngularRate:
+                self.direction.rotate(da)
+                self.velocity.rotate(da)
+                self.rotating = False
+            elif da:
+                da = da/abs(da) * config.AngularRate * dt
+                self.direction.rotate(da)
+                self.velocity.rotate(da)
+
+        # if dt != 0:
+        if self.moving :
+            vnew = self.velocity + self.direction * a * dt
+            if vnew.length < config.MaxSpeed:
+                self.velocity = vnew
+        elif self.velocity.length != 0:
+            dv = -self.velocity.normalized() * config.StopDeccelarate * dt
+            if dv.length >= self.velocity.length:
+                self.velocity *= 0
+            else:
+                self.velocity += dv
+        if not self.blocked:
+            self.position += (self.velocity + v0) * dt
 

@@ -68,3 +68,18 @@ while no one win:
     handle all event before t
     judge if some win
 
+
+Human player control
+-------------------
+LClick: select
+S-LClick: select add
+RClick: moveTo / attack
+C-RClick: rotateTo
+[S-]1,2,3,4,5: select
+
+View Control
+---------------
+ALT-[1-5]: switch view following to ship 1~5
+ALT-~: cancel follow
+Mouse Scroll forward/backward: zoom in/out
+Mouse on border: scrolling map

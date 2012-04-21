@@ -5,14 +5,22 @@ import pygame
 class ViewBox:
     MinScale = 0.2
     MaxScale = 2.
+    MaxSpeed = 60
     def __init__(self, size):
         self.originSize = size
         self.size = map(float, size)
         self.center = Vec2d(size[0]/2, size[1]/2)
         self.scale = 1.0
+        self.target = None
 
     def move(self, dp):
         self.center += dp
+
+    def move_to(self, pos):
+        self.center = Vec2d(pos)
+
+    def follow(self, target):
+        self.target = target
 
     def zoom(self, center, ds):
         s = self.scale
@@ -31,6 +39,17 @@ class ViewBox:
         self.center.x += px * (s - s1) + w1/2 - w/2
         self.center.y += py * (s - s1) + h1/2 - h/2
 
+    def step(self):
+        if self.target:
+            dp = self.target.position - self.center
+            if dp.length  < self.MaxSpeed:
+                self.center = Vec2d(self.target.position)
+                # if dp.length > 3:
+                #     w0, h0 = self.originSize
+                #     pygame.mouse.set_pos((w0/2, h0/2))
+            else:
+                self.center += dp.normalized() * self.MaxSpeed
+
     def inside(self, sprite):
         rect1 = pygame.Rect((0, 0), self.size)
         rect1.center = tuple(self.center)
@@ -47,7 +66,7 @@ class ViewBox:
         # convert a point in the world coordinate to screen coordinate
         w, h = self.size
         pTopleft = self.center - (w/2, h/2)
-        return Vec2d((p.x - pTopleft.x)/self.scale, (p.y - pTopleft.y)/self.scale)
+        return (p - pTopleft)/self.scale
 
     def lenWorld2screen(self, l):
         return l / self.scale

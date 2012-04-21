@@ -35,6 +35,9 @@ class Resource(pygame.sprite.Sprite):
         self.rect.center = self.position
         self._lastScale = 1.
 
+    def __hash__(self):
+        return self.id
+
     def update(self, viewBox):
         r1 = int(viewBox.lenWorld2screen(config.ResourceRadius))
         r2 = int(viewBox.lenWorld2screen(config.IslandBoundingRadius))
@@ -50,7 +53,7 @@ class Resource(pygame.sprite.Sprite):
         pygame.draw.circle(self.image, self.BoundingColor, (r1, r1), r1, dr)
 
     def test_world_size(self):
-        return (config.IslandBoundingRadius*2,)*2
+        return (config.ResourceRadius*2,)*2
 
     def __repr__(self):
         return 'Resource(%s, %s)' %(self.id, self.position)
