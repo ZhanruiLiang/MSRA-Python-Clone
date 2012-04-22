@@ -5,7 +5,7 @@ class Instruction:
         cmd, sec = args[:2]
         args = args[2:]
         self.cmd = cmd
-        self.sec = int(sec)
+        self.sec = float(sec)
         self.args = args
         self.faction = sender.faction
         self.rawstr = rawstr

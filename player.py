@@ -6,18 +6,20 @@ import socket
 import threading
 import config
 import pygame
+import visual
 from button import Button
 from pygame.locals import *
+from time import sleep
 
 class Player:
     def __init__(self, faction, port):
         self.name = None
-        self.color = (0, 0, 0, 0xff)
+        self.color = pygame.Color(0, 0, 0, 0xff)
         self.id = self.faction = faction
         self.ships = []
         self.resources = []
         self.instructions = []
-        
+
         self.init_server(port)
 
     def clear(self):
@@ -78,6 +80,16 @@ class Player:
             self.reciever = threading.Thread(target=self.recieve_instructions, 
                     args=(self.instLock,))
             self.reciever.start()
+
+            # get AI info
+            while 1:
+                inst = self.fetch_instruction()
+                if inst and inst.cmd == 'Info':
+                    name, r, g, b = inst.args
+                    self.color = pygame.Color(*map(int, (r, g, b, 0xff)))
+                    self.name = name
+                    break
+                sleep(0.05)
         except socket.error:
             return False
         return True
@@ -99,8 +111,8 @@ class Player:
 class HumanPlayer(Player):
     def __init__(self, faction):
         Player.__init__(self, faction, 0)
-        self.name = 'Player'
-        self.color = (0, 0xff, 0, 0xff)
+        self.name = 'HumanPlayer'
+        self.color = pygame.Color(0, 0xff, 0, 0xff)
         self.shippo = None
         self.selected = set()
         self.bindedShips =  set()
@@ -110,10 +122,7 @@ class HumanPlayer(Player):
             if event.button == 1:
                 add = pygame.key.get_mods() & pygame.KMOD_SHIFT
                 if ship.faction == self.faction:
-                    if not add:
-                        self.selected.clear()
-                    self.selected.add(ship)
-                    print 'selected', self.selected
+                    self.select(ship, add)
         return select_callback
 
     def mark_attack_er(self, target):
@@ -146,6 +155,17 @@ class HumanPlayer(Player):
         if not self.shippo: return
         viewBox = self.shippo.viewBox
 
+    def select(self, ship, add=0):
+        if add:
+            self.selected.add(ship)
+        else:
+            for ship1 in self.selected:
+                del self.shippo.visualSprites[:]
+            self.selected = set([ship])
+        if self.shippo:
+            self.shippo.visualSprites.append(visual.SelectedShip(ship))
+            self.shippo.detailBoard.update_target(ship)
+            self.shippo.viewBox.follow(ship)
 
     def handle(self, event):
         et = event.type
@@ -155,8 +175,19 @@ class HumanPlayer(Player):
                 if pygame.key.get_mods() & pygame.KMOD_CTRL:
                     print 'C-Rclick'
                     for ship in self.selected:
-                        self.instructions.append(
-                                'StartRotatingTo %d %d %.2f %.2f' % (self.shippo.currentSec, ship.id, worldX, worldY))
+                        # self.instructions.append(
+                        #         'StartRotatingTo %d %d %.2f %.2f' % (self.shippo.currentSec, ship.id, worldX, worldY))
+                        epos = self.shippo.viewBox.posScreen2world(event.pos)
+
+                        for target in self.shippo.ships:
+                            target.rect.collidepoint(event.pos)
+                            if (target.position - epos).length < target.hitRadius * 2:
+                                self.instructions.append(
+                                        'Attack %d %d %d' % (self.shippo.currentSec, ship.id, target.id))
+                                break
+                        else:
+                                self.instructions.append(
+                                        'Attack %d %d %d' % (self.shippo.currentSec, ship.id, 0))
                 else:
                     print 'Rclick'
                     for ship in self.selected:
@@ -175,22 +206,18 @@ class HumanPlayer(Player):
                                 'Stop %d %d' % (self.shippo.currentSec, ship.id))
             elif event.key in (K_1, K_2, K_3, K_4, K_5):
                 id = event.key - K_1 + 6
-                if event.mod & KMOD_SHIFT:
-                    for ship in self.ships:
-                        if ship.id == id:
-                            self.selected.add(ship)
-                            self.shippo.detailBoard.update_target(ship)
-                else:
-                    for ship in self.ships:
-                        if ship.id == id:
-                            self.selected = set([ship])
-                            self.shippo.detailBoard.update_target(ship)
-                            self.shippo.viewBox.follow(ship)
+                add = event.mod & KMOD_SHIFT
+                for ship in self.ships:
+                    if ship.id == id:
+                        self.select(ship, add)
+            elif event.key == K_c:
+                for ship in self.selected:
+                    ship._show_debug = not ship._show_debug
 
     def fetch_instruction(self):
         if self.instructions:
             instruction = Instruction(self, self.instructions.pop(0))
+            print 'fetch', instruction
         else:
             instruction = None
         return instruction
-        

@@ -1,7 +1,9 @@
 from pygame.sprite import Sprite
 import config
 import pygame
-from pygame import Rect
+from pygame import Rect, Color
+from ship import Ship
+from resource import Resource
 
 pygame.font.init()
 
@@ -43,46 +45,106 @@ class ShipDetailStatus(SubBoard):
     def __init__(self):
         size = (250, 240)
         SubBoard.__init__(self, size, None)
-        self.ship = None
+        self.target = None
         self.font = pygame.font.SysFont('monospace', 12)
         # self.clearRect = pygame.Rect((x0 - R, y0 - R), (2*R, 2*R))
         margin = self.Margin + 1
-        self.clearRect = pygame.Rect((margin, margin), (self.size[0]-2*margin, self.size[1]-2*margin))
+        self.clearRect = pygame.Rect((margin-1, margin-1), (self.size[0]-2*margin, self.size[1]-2*margin))
 
-    def update_target(self, ship):
-        self.ship = ship
+    def update_target(self, target):
+        self.target = target
 
     def update(self):
         draw = pygame.draw
         # clear
         draw.rect(self.image, self.BgColor, self.clearRect)
-        if self.ship is None: 
+        if self.target is None: 
             return
-        ship = self.ship
-
         margin = self.Margin
-        x0, y0 = margin + 2, margin + 2
-        dy = self.TitleHeight + 2
-        self.write((x0, y0), 'ID:')
-        self.write((x0, y0 + dy), 'faction:')
-        self.write((x0, y0 + dy * 2), 'position:')
-        self.write((x0, y0 + dy * 3), 'velocity:')
-        self.write((x0, y0 + dy * 4), 'direction:')
-        x1, y1 = x0 + self.TitleWidth, y0
-        self.write((x1, y1), str(ship.id))
-        self.write((x1, y1 + dy), str(ship.faction))
-        self.write((x1, y1 + dy * 2), str(ship.position))
-        self.write((x1, y1 + dy * 3), str(ship.velocity))
-        # draw.rect(self.image, self.VelocityColor, Rect((x1, y1 + dy * 3 -1), (self.BarWidth, self.TitleHeight)))
-        draw.rect(self.image, self.DirectionColor, Rect((x1, y1 + dy * 4 -1), (self.BarWidth, self.TitleHeight)))
+        if isinstance(self.target, Ship):
+            ship = self.target
 
-        R = self.PanRadius
-        x2, y2 = x0 + self.TitleWidth + R, y1 + dy * 5 + R
-        draw.circle(self.image, self.PanColor, (x2, y2), R)
-        draw.line(self.image, self.DirectionColor, (x2, y2), 
-                (x2 + ship.direction.x * R, y2 + ship.direction.y * R), 2)
-        draw.line(self.image, self.VelocityColor, (x2, y2), 
-                (x2 + ship.velocity.x / config.MaxSpeed * R, y2 + ship.velocity.y / config.MaxSpeed * R), 1)
+            x0, y0 = margin + 2, margin + 2
+            dy = self.TitleHeight + 2
+            self.write((x0, y0), 'ID:')
+            self.write((x0, y0 + dy), 'faction:')
+            self.write((x0, y0 + dy * 2), 'position:')
+            self.write((x0, y0 + dy * 3), 'velocity:')
+            self.write((x0, y0 + dy * 4), 'direction:')
+            x1, y1 = x0 + self.TitleWidth, y0
+            self.write((x1, y1), str(ship.id))
+            self.write((x1, y1 + dy), str(ship.faction))
+            self.write((x1, y1 + dy * 2), str(ship.position))
+            self.write((x1, y1 + dy * 3), str(ship.velocity))
+            # draw.rect(self.image, self.VelocityColor, Rect((x1, y1 + dy * 3 -1), (self.BarWidth, self.TitleHeight)))
+            draw.rect(self.image, self.DirectionColor, Rect((x1, y1 + dy * 4 -1), (self.BarWidth, self.TitleHeight)))
+
+            R = self.PanRadius
+            x2, y2 = x0 + self.TitleWidth + R, y1 + dy * 5 + R
+            draw.circle(self.image, self.PanColor, (x2, y2), R)
+            draw.line(self.image, self.DirectionColor, (x2, y2), 
+                    (x2 + ship.direction.x * R, y2 + ship.direction.y * R), 2)
+            draw.line(self.image, self.VelocityColor, (x2, y2), 
+                    (x2 + ship.velocity.x / config.MaxSpeed * R, y2 + ship.velocity.y / config.MaxSpeed * R), 1)
+        elif isinstance(self.target, Resource):
+            res = self.target
+
+            x0, y0 = margin + 2, margin + 2
+            dy = self.TitleHeight + 2
+            self.write((x0, y0), 'ID:')
+            self.write((x0, y0 + dy), 'faction:')
+            self.write((x0, y0 + dy * 2), 'position:')
+
+            x1, y1 = x0 + self.TitleWidth, y0
+            self.write((x1, y1), str(res.id))
+            self.write((x1, y1 + dy), str(res.faction))
+            self.write((x1, y1 + dy * 2), str(res.position))
+
+class HPRecorder:
+    FPS = 30 / 3
+    HPColor = (0x88, 0, 0, 0xff)
+    HPColorDamage = (0xff, 0, 0, 0xff)
+    HPColorRecover = (0xff, 0, 0, 0xff)
+    def __init__(self, ship):
+        self.ship = ship
+        self.hp1 = ship.armor
+        self.hp2 = ship.armor
+        self.t = 0
+        self.dt = 1.0/self.FPS
+        self.maxT1 = 0.5
+        self.maxT2 = 0.8
+        self.dhp = 0
+
+    def update(self, image, basePos, width, height):
+        xb, yb = basePos
+        if self.ship.armor != self.hp1:
+            if abs(self.ship.armor - self.hp1) > 5:
+                # new damage
+                self.hp2 = self.hp1
+                self.hp1 = self.ship.armor
+                self.t = 0
+                print 'new damage', self.hp1, self.hp2
+            else:
+                self.hp1 = self.ship.armor
+        if self.t < self.maxT1:
+            if self.t + self.dt >= self.maxT1:
+                self.dhp = (self.hp1 - self.hp2) / (self.maxT2 - self.maxT1)
+        elif self.t < self.maxT2:
+            self.hp2 += self.dhp * self.dt
+        else:
+            self.hp2 = self.hp1
+        self.t += self.dt
+
+        hp1, hp2 = self.hp1, self.hp2
+        rect = Rect((0, 0), (width, hp1/config.MaxArmor * height))
+        rect.bottomleft = (xb, yb)
+        pygame.draw.rect(image, self.HPColor, rect)
+        if hp1 < hp2:
+            rect.size = (width, (hp2 - hp1)/config.MaxArmor * height)
+            rect.bottomleft = (xb,1 + yb - hp1/config.MaxArmor * height)
+            pygame.draw.rect(image, self.HPColorDamage, rect)
+
+
 
 class ShipStatus(SubBoard):
     titleWidth = 80
@@ -93,11 +155,12 @@ class ShipStatus(SubBoard):
     dotR = 10
     barColor0 = SubBoard.BgColor
     barColor1 = (0x88, 0, 0, 0xff)
+    barColor2 = (0x56, 0x64, 0x9d, 0xff)
     dotColor0 = (0x55, 0x55, 0x55, 0xff)
     dotColor1 = (0x00, 0xff, 0x00, 0xff)
     def __init__(self, size, data):
         SubBoard.__init__(self, size, data)
-        player = data
+        self.player = player = data
 
         self.write((self.Margin, self.Margin), player.name)
         self.p0x, self.p0y = self.titleWidth, 20 + self.Margin
@@ -107,13 +170,14 @@ class ShipStatus(SubBoard):
         self.write((self.Margin, self.p1y + self.titleHeight), 'blocked:')
         self.write((self.Margin, self.p1y + self.titleHeight * 2), 'rotating:')
 
-        self.clearRect = pygame.Rect((self.p0x, self.p0y),
+        self.clearRect = pygame.Rect((self.p0x-1, self.p0y-1),
                 (size[0] - self.p0x - 2*self.Margin, size[1] - self.p0y - 2* self.Margin))
                 # ((self.barWidth + self.barMargin)*5 + 2, self.barHeight + self.titleHeight * 3 + 2))
+        self.ships = player.ships[:]
+        self.hpRecorders = [HPRecorder(ship) for ship in self.ships]
 
     def update(self):
-        player = self.data
-        ships = player.ships
+        ships = self.ships
         # clear
         pygame.draw.rect(self.image, self.BgColor, self.clearRect)
         draw = pygame.draw
@@ -121,11 +185,22 @@ class ShipStatus(SubBoard):
 
         # draw bar
         x, y = self.p0x, self.p0y
-        for ship in ships:
+        w1 = 3
+        w2 = barWidth - w1 * 2
+        for ship, hpRecorder in zip(ships, self.hpRecorders):
             draw.rect(self.image, self.barColor0, pygame.Rect((x, y), (barWidth, barHeight)))
-            h1 = barHeight * ship.armor / config.MaxArmor
-            draw.rect(self.image, self.barColor1, 
-                    pygame.Rect((x, y + barHeight - h1), (barWidth, h1)))
+            if ship.armor >= 0:
+                h0 = (1 - ship.cooldowns[1]/config.CannonSpan)*barHeight
+                # h1 = barHeight * ship.armor / config.MaxArmor
+                h2 = (1 - ship.cooldowns[0]/config.CannonSpan)*barHeight
+
+                draw.rect(self.image, self.barColor2, 
+                        pygame.Rect((x, y + barHeight - h0), (w1, h0)))
+                # draw.rect(self.image, self.barColor1, 
+                #         pygame.Rect((x + w1, y + barHeight - h1), (w2, h1)))
+                hpRecorder.update(self.image, (x + w1, y + barHeight), w2, barHeight)
+                draw.rect(self.image, self.barColor2, 
+                        pygame.Rect((x + w1 + w2, y + barHeight - h2), (w1, h2)))
             x, y = (x + self.barWidth + self.barMargin, y)
         # draw dots
         r1 = self.barWidth / 2
@@ -147,6 +222,7 @@ class DashBoard:
         self.rect = pygame.Rect(pos, size)
         self.image = pygame.Surface(self.rect.size).convert_alpha()
         self.boards = []
+        self.hided = 0
 
     def add_board(self, board):
         if self.boards:
@@ -158,6 +234,7 @@ class DashBoard:
         self.boards.append(board)
 
     def update(self):
+        if self.hided: return
         self.image.fill(self.BgColor)
         for board in self.boards:
             board.update()

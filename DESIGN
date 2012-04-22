@@ -1,13 +1,24 @@
 instruction format
 ------------
 definition:
-    {instruction name} {sec} {arguments}
+    {instruction name} {sent time} {arguments}
 
 example:
-    moveto 354 123.45 234.56
+    MoveTo 354 123.45 234.56
 
-This means send a "moveto" instruction 354 seconds after the game start. (123.45, 234.56) is 
+This means send a "MoveTo" instruction 354 seconds after the game start. (123.45, 234.56) is 
 the destination.
+
+AI connect to player
+---------------------
+1. socket connect
+2. AI send instruction to player server:
+        Info {sent time} {AI name} {R} {G} {B}
+
+AI ask for data
+-------------------------
+Very simple:
+        Data {sent time}
 
 ShipInfo raw format
 --------------

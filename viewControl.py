@@ -1,13 +1,14 @@
 from button import Button
 from pygame import Rect
 import pygame
+from pygame.locals import *
 
 class ViewControl:
     def __init__(self, shippo):
         self.shippo = shippo
         self.size = shippo.W, shippo.H
 
-        # init buttons
+        # init view control buttons
         thick = 40
         w, h = self.size
         visible = 0
@@ -44,19 +45,25 @@ class ViewControl:
         hidedash.bind(Button.Over, self.hide_dash)
         def start_show(event):
             self.showingDash = 1
+            self.shippo.dashBoard.hided = 0
         hidedash.bind(Button.Out, start_show)
         self.showingDash = 0
 
         # bind events for every ship
-        def shower(ship):
+        def shower(obj):
             def show_detail(event):
-                shippo.detailBoard.update_target(ship)
+                shippo.detailBoard.update_target(obj)
             return show_detail
 
         for ship in self.shippo.ships:
             ship.button.bind(Button.Over, shower(ship))
             ship.button.bind(Button.Out, shower(None))
-            shippo.pyeventHandlers.append(ship.button)
+
+        for res in self.shippo.resources:
+            res.button.bind(Button.Over, shower(res))
+            res.button.bind(Button.Out, shower(None))
+
+        self.vim_bindings = {K_h: self.mover((-speed, 0)), K_j: self.mover((0, speed)), K_k: self.mover((0, -speed)), K_l: self.mover((speed, 0))}
 
     def hide_dash(self, event):
         dash = self.shippo.dashBoard
@@ -64,6 +71,7 @@ class ViewControl:
         speed = 20
         if abs(dash.rect.left - x0) < speed:
             dash.rect.left = x0
+            dash.hided = 1
         else:
             dash.rect.left += speed
 
@@ -94,13 +102,20 @@ class ViewControl:
                         self.shippo.viewBox.follow(ship)
                         self.shippo.detailBoard.update_target(ship)
                         break
-            if (event.mod & pygame.KMOD_ALT) and event.key == ord('`'):
+            elif (event.mod & pygame.KMOD_ALT) and event.key == ord('`'):
                 self.shippo.viewBox.follow(None)
+            if event.key == K_LALT:
+                show = sum(1 for ship in self.shippo.ships if ship._show_debug)
+                for ship in self.shippo.ships:
+                    ship._show_debug = not show
 
     def step(self):
         for button in self.buttons:
             button.step()
+        pressed = pygame.key.get_pressed()
+        for key in self.vim_bindings:
+            if pressed[key]:
+                self.vim_bindings[key](None)
         self.shippo.viewBox.step()
         if self.showingDash:
             self.show_dash()
-            

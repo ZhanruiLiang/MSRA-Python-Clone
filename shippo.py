@@ -2,6 +2,7 @@ import config
 import pygame
 import dashboard
 import visual
+import math
 from events import *
 from pygame.locals import *
 from player import Player, HumanPlayer
@@ -11,6 +12,7 @@ from vec2d import Vec2d
 from viewBox import ViewBox
 from viewControl import ViewControl
 from heapq import heappush, heappop
+from win import WinScreen
 
 
 class Instruction:
@@ -23,10 +25,13 @@ class Instruction:
         self.sec = sec
         self.args = args
 
+def sprite_cmp(s1, s2):
+    return cmp(s1.layer, s2.layer)
+
 class Shippo:
     W = config.W
     H = config.H
-    FPS = 40
+    FPS = 30
     LFPS = 60 # logic frame per sec
     SeaColor = (0, 0x55, 0xff, 0xff)
     BoardSize = (270, H-4)
@@ -52,23 +57,24 @@ class Shippo:
         self.needQuit = 0
         self.currentSec = 0
         self.running = False
+        self.renderCnt = 0
 
         self.blockings = []
         self.accuCallbacks = []
 
         self.pyeventHandlers = []
         self.ViewControl = None
+        self.winScreen = None
+
 
     def add_player(self, player):
-        dash = dashboard.ShipStatus(self.SubBoardSize, player)
-        self.dashBoard.add_board(dash)
         self.players.append(player)
 
     def apply_instruction(self, inst):
         # apply an instruction
-        print 'apply', inst
         cmd = inst.cmd
         args = inst.args
+        print 'apply', inst
         if cmd == 'MoveTo':
             self.ins_move_to(inst.faction, int(args[0]), float(args[1]), float(args[2]))
         elif cmd == 'Attack':
@@ -122,7 +128,6 @@ class Shippo:
         return None
 
     def ins_move_to(self, faction, shipId, x, y):
-        print 'ins_move_to', shipId, x, y
         ship = self.get_ship_by_id(shipId)
         if ship is None or ship.faction != faction:
             return False
@@ -168,7 +173,6 @@ class Shippo:
 
     def ins_stop(self, faction, shipId):
         # stop both moving and rotating
-        print 'ins_stop', shipId
         ship = self.get_ship_by_id(shipId)
         if ship is None or ship.faction != faction:
             return False
@@ -199,25 +203,51 @@ class Shippo:
         w, h = (config.MapWidth, config.MapHeight)
         rect = pygame.Rect((0, 0), (viewBox.lenWorld2screen(w), viewBox.lenWorld2screen(h)))
         rect.topleft = viewBox.posWorld2screen(rect.topleft)
-        pygame.draw.rect(screen, (0xff,)*4, rect, 1)
-        
+        pygame.draw.rect(screen, (0x7f, 0x7f, 0x7f, 0x30), rect, 1)
+
         # update sprites
         # draw visual effects
-        for sp in self.visualSprites:
-            if viewBox.inside(sp):
-                sp.update(viewBox)
-                screen.blit(sp.image, sp.rect)
-        self.visualSprites = [effect for effect in self.visualSprites if not effect._kill]
         # draw the resources
         # draw the ships
-        sprites = self.resources + self.ships
+        sprites = self.resources + self.ships + self.visualSprites
+        sprites.sort(sprite_cmp)
         for sp in sprites:
             if viewBox.inside(sp):
                 sp.update(viewBox)
                 screen.blit(sp.image, sp.rect)
+
+        # draw ship moving targets, attacking target, if exist
+        attackR = viewBox.lenWorld2screen(config.CannonRange) 
+        attackRect = pygame.Rect((0, 0), (attackR * 2, )*2)
+        for ship in self.ships:
+            target = ship.moveTarget
+            center = map(int, viewBox.posWorld2screen(ship.position))
+            if target:
+                pygame.draw.aaline(screen, pygame.Color("yellow"), center,
+                        map(int, viewBox.posWorld2screen(target)))
+            if ship.attackTarget:
+                pygame.draw.aaline(screen, pygame.Color("red"), center,
+                        map(int, viewBox.posWorld2screen(ship.attackTarget.position)))
+
+            if ship._show_debug:
+                # draw range of view
+                pygame.draw.circle(screen, pygame.Color("green"), center, 
+                        int(viewBox.lenWorld2screen(config.RangeOfView)), 1)
+                # draw range of attack
+                # DOC: pygame.draw.arc(Surface, color, Rect, start_angle, stop_angle, width=1): return Rect
+                angle = ship.direction.angle
+                attackRect.center = center
+                a0 = (180 - config.CannonAngle)/2
+                # pygame.draw.arc(screen, Color("red"), attackRect, math.radians(angle + a0), math.radians(angle + 180))
+                pygame.draw.arc(screen, Color("red"), attackRect, -math.radians(angle + 180 - a0), -math.radians(angle + a0))
+                pygame.draw.arc(screen, Color("red"), attackRect, -math.radians(angle - a0), -math.radians(angle - 180 + a0))
+                pygame.draw.circle(screen, pygame.Color("green"), center, 
+                        int(viewBox.lenWorld2screen(config.RangeOfView)), 1)
         # draw dashBoard
         dash = self.dashBoard
-        dash.update()
+        self.renderCnt += 1
+        if self.renderCnt % 3 == 0:
+            dash.update()
         screen.blit(dash.image, dash.rect)
 
         # draw UI sprites
@@ -225,6 +255,11 @@ class Shippo:
             if sp.visible:
                 sp.update()
                 self.screen.blit(sp.image, sp.rect)
+
+        # draw winScreen
+        if self.winScreen:
+            self.winScreen.update()
+            screen.blit(self.winScreen.image, self.winScreen.rect)
 
         pygame.display.flip()
 
@@ -267,25 +302,32 @@ class Shippo:
         p2 = Vec2d(600, 600)
         p3 = Vec2d(config.MapWidth - p2.x, config.MapHeight - p2.y)
 
+        dh = 40
         level0 = {'rPoss':[(p2.x, p2.y), (p2.x, p3.y), (p3.x, p2.y), (p3.x, p3.y), (p2+p3)/2],
-                'sPoss1':[p0 + (0, i * 80) for i in xrange(5)],
-                'sPoss2':[p1 + (0, i * 80) for i in xrange(5)],
+                'sPoss1':[p0 + (0, i * dh) for i in xrange(5)],
+                'sPoss2':[p1 + (0, i * dh) for i in xrange(5)],
                 }
+        self.timeLimit = 60 * 5
         id = 1
         for pos in level0['rPoss']:
             resource = Resource(id, pos)
             id += 1
             self.resources.append(resource)
+            self.pyeventHandlers.append(resource.button)
         # add ship for player 1
         id = 1
         player = self.players[0]
         for pos in level0['sPoss1']:
             ship = Ship(id, 1, pos)
-            ship.moving = 1
+            # ship.moving = 1
             ship.color = player.color
             player.ships.append(ship)
             self.ships.append(ship)
+            self.pyeventHandlers.append(ship.button)
             id += 1
+        # add dashboard for player1
+        dash = dashboard.ShipStatus(self.SubBoardSize, player)
+        self.dashBoard.add_board(dash)
         # add ship for player 2
         player = self.players[1]
         for pos in level0['sPoss2']:
@@ -294,7 +336,11 @@ class Shippo:
             ship.color = player.color
             player.ships.append(ship)
             self.ships.append(ship)
+            self.pyeventHandlers.append(ship.button)
             id += 1
+        # add dashboard for player2
+        dash = dashboard.ShipStatus(self.SubBoardSize, player)
+        self.dashBoard.add_board(dash)
 
         # add ship detail board
         self.detailBoard = dashboard.ShipDetailStatus()
@@ -325,8 +371,8 @@ class Shippo:
                 inst = player.fetch_instruction()
                 if inst is None: 
                     break
-                if inst.sec != self.currentSec:
-                    continue
+                # if inst.sec != self.currentSec:
+                #     continue
                 # apply the instruction, maybe not success
                 self.apply_instruction(inst)
                 done = True
@@ -339,7 +385,7 @@ class Shippo:
         self.running = True
 
         renderDt = 1.0/self.FPS
-        instDt = 1.0/config.MaxInstPerSec 
+        instDt = 1.0/config.MaxInstPerSec
         eventDt = 1.0/self.FPS
         logicDt = 1.0/self.LFPS
 
@@ -359,13 +405,13 @@ class Shippo:
                     self.visualSprites.append(effect)
         self.register_accumulate_callback(0.1, add_visual_effect)
 
-        def clear_instructions():
-            for player in self.players:
-                player.clear()
-        self.register_accumulate_callback(1.0, clear_instructions)
+        # def clear_instructions():
+        #     for player in self.players:
+        #         player.clear()
+        # self.register_accumulate_callback(1.0, clear_instructions)
 
         while not self.needQuit:
-            self.currentSec = int(self.t)
+            self.currentSec = self.t
             timer1.tick()
             # try activate accumulate callbacks
             for acb in self.accuCallbacks:
@@ -375,14 +421,14 @@ class Shippo:
                     callback()
             if self.needQuit: break
             # game logic
-            # dt = logicDt - timer1.tick()/1000
-            dt = logicDt
+            dt = logicDt - timer1.tick()/1000
             self.step(dt)
-            dt = timer.tick(self.LFPS) / 1000.0
+            if self.needQuit: break
             for acb in self.accuCallbacks:
                 acb[0] += dt
-            self.t += dt 
-            # print 'FPS:', timer.get_fps()
+                # acb[0] += logicDt
+            timer.tick(self.LFPS)
+            # print 'LFPS:', timer.get_fps()
 
     def register_accumulate_callback(self, dt, callback):
         self.accuCallbacks.append([0, dt, callback])
@@ -408,15 +454,51 @@ class Shippo:
                 dtl = dtm
         return t
 
-    def ship_attack(self, ship, cannon, targetID):
-        """cannon = 0 or 1, target maybe None or other shipId"""
-        # TODO
-        pass
+    def ship_attack(self, time, ship):
+        if ship.attackTarget is None: return
+        for cannon in [0, 1]:
+            if ship.cooldowns[cannon] == 0 and ship.in_cannon_range(cannon, ship.attackTarget):
+                target = ship.attackTarget
+                dp = (target.position - ship.position)
+                d = dp.length
+                R = config.CannonRange
+                damage = 200 * (1 - (d/R)**2)**0.5 * (
+                        1 - ship.direction.normalized().dot( ship.velocity - target.velocity)/ 100)
+                p1 = target.direction.rotated(-30)
+                p2 = target.direction.rotated(30)
+                if p1.cross(dp) * p2.cross(dp) <= 0:
+                    # bonus hit
+                    damage *= 2
+                self.add_event(ShipDamage(time + d / 150, target, damage))
+                self.visualSprites.append(visual.BulletHit(ship.position, target.position, d / 150))
+                ship.cooldowns[cannon] = config.CannonSpan
+                break
 
     def handle_event(self, event):
         if isinstance(event, ObjHit):
+            # handle ObjHit
             obj1 = event.obj1
-            obj1.velocity *= 0
+            obj2 = event.obj2
+            dp = obj2.position - obj1.position
+            R = (obj1.hitRadius + obj2.hitRadius)
+            dpnor = dp.normalized()
+            # if isinstance(obj2, Ship) and obj2.faction != obj1.faction:
+            if isinstance(obj2, Ship):
+                dv = obj1.velocity - obj2.velocity
+                if dv.dot(dpnor) > 7.5 and dpnor.dot(obj1.direction.normalized()) >= 0.8660254037: # sqrt(3)/2
+                    hitDamage = obj1.direction.dot(dv) * 14 + 100
+                    self.add_event(ShipDamage(event.time, obj2, hitDamage))
+                    self.add_event(ShipDamage(event.time, obj1, hitDamage/2))
+                    self.visualSprites.append(visual.ExplodeEffect((obj1.position + obj2.position)/2, hitDamage))
+                    # print '%d hit %d, damage %s' %(obj1.id, obj2.id, hitDamage)
+                obj1.position -= (R - dp.length)/2 * dpnor
+                obj2.position += (R - dp.length)/2 * dpnor
+            else:
+                obj1.position -= (R - dp.length) * dpnor
+            v1 = obj1.velocity
+            v1 -= dpnor * dpnor.dot(v1)
+            # v1 *= 0.9
+
             obj1.blocked = 1
         elif isinstance(event, ShipDamage):
             ship = event.ship
@@ -434,76 +516,126 @@ class Shippo:
         #     self.ship_attack(ship, event.cannon, event.target)
         elif isinstance(event, ShipDie):
             ship = event.ship
+            if ship not in self.ships: return
             self.ships.remove(ship)
+            for ship1 in self.ships:
+                if ship1.attackTarget == ship:
+                    ship1.attackTarget = None
             self.players[ship.faction-1].ships.remove(ship)
 
     def hittest(self, obj1, obj2):
         dp = obj2.position - obj1.position
         R = obj1.hitRadius + obj2.hitRadius
         if dp.length <= R:
-            v1 = obj1.velocity
-            if v1.dot(dp.normalized()) >= 0:
+            if obj1.velocity.dot(dp.normalized()) > 0:
                 return True
         return False
 
-    def exist_hit(self):
-        n = len(self.ships)
-        ss = self.ships
-        for i in xrange(n):
-            for j in xrange(n):
-                if i != j:
-                    if (ss[i], ss[j]) not in self.blockings:
-                        if self.hittest(ss[i], ss[j]):
-                            return True
-            for r in self.resources:
-                if (ss[i], r) not in self.blockings:
-                    if self.hittest(ss[i], r):
-                        return True
-        return False
+    def detect_hit(self):
+        for ship in self.ships:
+            for ship1 in self.ships:
+                if ship != ship1:
+                    if self.hittest(ship, ship1):
+                        hitEvent = ObjHit(self.t, ship, ship1)
+                        # self.blockings.append((ship, ship1))
+                        self.add_event(hitEvent)
+            for resource in self.resources:
+                if self.hittest(ship, resource):
+                    hitEvent = ObjHit(self.t, ship, resource)
+                    # self.blockings.append((ship, resource))
+                    self.add_event(hitEvent)
 
     def step(self, dt0):
         events = self.events
         t = 0
+        for ship in self.ships:
+            ship.blocked = 0
         while t < dt0:
             dt = dt0 - t
             if events:
-                dt = min(dt, events[0].time - t - self.t)
-            dtr = self.phy_step(dt)
+                dt = min(dt, events[0].time - self.t)
+            # dtr = self.phy_step(dt)
+            # for ship in self.ships:
+            #     ship.short_step(-dtr)
+            #     ship.step(dtr)
+            # t += dtr
             for ship in self.ships:
-                ship.short_step(-dtr)
-                ship.step(dtr)
-            t += dtr
-            if self.exist_hit():
-                for ship in self.ships:
-                    for ship1 in self.ships:
-                        if ship != ship1 and (ship, ship1) not in self.blockings:
-                            if self.hittest(ship, ship1):
-                                hitEvent = ObjHit(self.t + t, ship, ship1)
-                                self.blockings.append((ship, ship1))
-                                self.add_event(hitEvent)
-                    for resource in self.resources:
-                        if self.hittest(ship, resource) and (ship, resource) not in self.blockings:
-                            hitEvent = ObjHit(self.t + t, ship, resource)
-                            self.blockings.append((ship, resource))
-                            self.add_event(hitEvent)
-                #exist hit
-                # print 'exist hit', self.events
-            # print events
+                ship.step(dt)
+            t += dt
+            self.t += dt
+            self.detect_hit()
 
-            while events:
-                if events[0].time > self.t + t:
-                    break
+            while events and events[0].time <= self.t:
                 e = heappop(events)
                 self.handle_event(e)
 
-            blockings = []
-            for obj1, obj2 in self.blockings:
-                if self.hittest(obj1, obj2):
-                    obj1.velocity *= 0
-                    blockings.append((obj1, obj2))
-                else:
-                    obj1.blocked = False
-            self.blockings = blockings
-            # print 'Blocking', self.blockings
         for sp in self.visualSprites:
             sp.step(dt0)
+        self.visualSprites = [effect for effect in self.visualSprites if not effect._kill]
+
+        # ship try attack
+        for ship in self.ships:
+            if ship.attackTarget is not None:
+                # try to attack
+                self.ship_attack(self.t, ship)
+        # ship recover
+        for player in self.players:
+            recover = dt * config.ResourceRestoreRate[sum(1 for r in self.resources if r.faction == player.faction)]
+            if recover:
+                for ship in player.ships:
+                    ship.armor = min(ship.armor + recover, config.MaxArmor)
+        # resource distribute
+        for res in self.resources:
+            del res.ships[:]
+            for ship in self.ships:
+                if (ship.position - res.position).length <= config.ResourceRadius:
+                    res.ships.append(ship)
+            res.step(dt0)
+            if res.faction:
+                col = res.boundingColor
+                col1 = self.players[res.faction-1].color
+                col.r, col.g, col.b = col1.r, col1.g, col1.b
+        # test gameover
+        if self.winScreen is None:
+            self.test_gameover()
+        elif self.winScreen.finished:
+            self.quit()
+
+    def test_gameover(self):
+        # test if a player wins
+        winner = None
+        p1 = self.players[0]
+        p2 = self.players[1]
+        cnt1 = len(p1.ships)
+        cnt2 = len(p2.ships)
+        if self.t <= self.timeLimit:
+            if cnt2 == 0:
+                winner = p1
+            elif cnt1 == 0:
+                winner = p2
+        else:
+            if cnt1 != cnt2:
+                if cnt1 > cnt2:
+                    winner = p1
+                elif cnt1 < cnt2:
+                    winner = p2
+                else:
+                    rcnt1 = sum(1 for r in self.resources if r.faction == player1.faction)
+                    rcnt2 = sum(1 for r in self.resources if r.faction == player2.faction)
+                    if rcnt1 > rcnt2:
+                        winner = p1
+                    elif rcnt1 < rcnt2:
+                        winner = p2
+                    else:
+                        hp1 = sum(ship.armor for ship in player1.ships)
+                        hp2 = sum(ship.armor for ship in player2.ships)
+                        if hp1 > hp2:
+                            winner = p1
+                        else:
+                            winner = p2
+        if winner is not None:
+            win = WinScreen(winner)
+            self.winScreen = win
+            self.pyeventHandlers.append(win)
+            return True
+        return False

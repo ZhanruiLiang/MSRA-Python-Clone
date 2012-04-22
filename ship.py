@@ -2,6 +2,7 @@ from vec2d import Vec2d
 from pygame.sprite import Sprite
 import pygame
 import config
+import math
 from button import Button
 
 Transparent = (0, 0, 0, 0)
@@ -47,6 +48,7 @@ class Ship(Sprite):
     FanColor = (0, 0, 0, 0xff)
     ImgRadius = config.ShipBoundingRadius * 2
     def __init__(self, id, faction, pos, **args):
+        self.layer = 10
         self.faction = faction
         self.id = id
         self.position = Vec2d(pos)
@@ -54,6 +56,7 @@ class Ship(Sprite):
         self.direction = Vec2d(1, 0)
         self.armor = config.MaxArmor
         self.hitRadius = config.ShipBoundingRadius
+        self._show_debug = 0
 
         for arg in args:
             setattr(self, arg, args[arg])
@@ -155,51 +158,42 @@ class Ship(Sprite):
                 self.velocity *= 0
             else:
                 self.velocity += dv
-        if not self.blocked:
-            self.position += (self.velocity + v0) * dt
+        # if not self.blocked:
+        self.position += (self.velocity + v0) * dt
 
     def step(self, dt):
+        assert dt > 0
         a = config.Acceleration
         v0 = self.velocity + (0, 0)
-        if self.moveTarget is not None:
-            dp = self.moveTarget - self.position
-            angle = dp.angle
+        if self.moveTarget is not None or self.rotateTarget is not None:
             myAngle = self.direction.angle
-            if dp.length < config.StopRange:
-                self.moveTarget = None
-                self.moving = False
+            if self.moveTarget is not None:
+                dp = self.moveTarget - self.position
+                angle = dp.angle
+                da = angle - myAngle
+                if dp.length < config.StopRange:
+                    self.moveTarget = None
+                    self.moving = False
+            elif self.rotateTarget is not None:
+                if isinstance(self.rotateTarget, float):
+                    da = self.rotateTarget - myAngle
+                else:
+                    da = Vec2d(self.rotateTarget - self.position).angle - myAngle
 
-            da = angle - myAngle
             if da > 180: da -= 360
             elif da < -180: da += 360
             if abs(da) <= dt * config.AngularRate:
                 self.direction.rotate(da)
-                self.velocity.rotate(da)
                 self.rotating = False
             elif da:
                 da = da/abs(da) * config.AngularRate * dt
                 self.direction.rotate(da)
-                self.velocity.rotate(da)
-        elif self.rotateTarget is not None:
-            myAngle = self.direction.angle
-            if isinstance(self.rotateTarget, float):
-                da = self.rotateTarget - myAngle
+
+            if da > 0:
+                self.velocity += self.velocity.rotated(92) * math.radians(config.AngularRate) * dt
             else:
-                da = Vec2d(self.rotateTarget - self.position).angle - myAngle
+                self.velocity += self.velocity.rotated(-92) * math.radians(config.AngularRate) * dt
 
-            if da > 180: da -= 360
-            elif da < -180: da += 360
-
-            if abs(da) <= dt * config.AngularRate:
-                self.direction.rotate(da)
-                self.velocity.rotate(da)
-                self.rotating = False
-            elif da:
-                da = da/abs(da) * config.AngularRate * dt
-                self.direction.rotate(da)
-                self.velocity.rotate(da)
-
-        # if dt != 0:
         if self.moving :
             vnew = self.velocity + self.direction * a * dt
             if vnew.length < config.MaxSpeed:
@@ -210,6 +204,25 @@ class Ship(Sprite):
                 self.velocity *= 0
             else:
                 self.velocity += dv
-        if not self.blocked:
-            self.position += (self.velocity + v0) * dt
+        # if not self.blocked:
+        self.position += (self.velocity + v0) * dt
+
+        for i in (0, 1):
+            self.cooldowns[i] = max((self.cooldowns[i] - dt), 0)
+
+    def in_cannon_range(self, cannon, ship):
+        # R = config.CannonRange + ship.hitRadius
+        R = config.CannonRange - 0.1
+        A = config.CannonAngle
+        a0 = self.direction.angle
+        if cannon == 0:
+            p1 = Vec2d(R, 0).rotated(a0 + (180 - A)/2)
+        else:
+            p1 = Vec2d(R, 0).rotated(a0 - 180  + (180 - A)/2)
+        p2 = p1.rotated(A)
+        dp = ship.position - self.position
+        if dp.length <= R and p1.cross(dp) >= 0 and  p2.cross(dp) <= 0:
+            return True
+        else:
+            return False
 
