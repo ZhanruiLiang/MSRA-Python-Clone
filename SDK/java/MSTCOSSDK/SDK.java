@@ -1,13 +1,14 @@
 /* package MSTCOSSDK; */
 import java.net.*;
 import java.io.*;
+import java.util.Scanner;
 
 public class SDK{
     String name;
     String color;
 
     Socket clientSocket;
-    StreamTokenizer in;
+    Scanner in;
     OutputStreamWriter out;
 
     public static final int Port = 55001;
@@ -36,9 +37,9 @@ public class SDK{
                 out.flush();
                 System.out.println("flush");
 
-                in = new StreamTokenizer(
-                        new BufferedReader(
-                            new InputStreamReader(clientSocket.getInputStream())));
+                in = new Scanner(clientSocket.getInputStream());
+                        /* new BufferedReader( */
+                        /*     new InputStreamReader(clientSocket.getInputStream()))); */
                 break;
             }catch(IOException ioException){
                 /* System.out.println("get stream failed, retry"); */

@@ -1,5 +1,6 @@
 /* package MSTCOSSDK; */
 import java.io.*;
+import java.util.Scanner;
 public class ShipInfo {
     int ID;
     int Faction;
@@ -18,51 +19,48 @@ public class ShipInfo {
     float VelocityY;
     /* public ShipInfo(int, int, float, float, float, float, float, float, float, float, float, boolean, boolean, boolean, float[]); */
     public ShipInfo(){}
-    public void update(StreamTokenizer in) throws IOException{
+    public void update(Scanner in) throws IOException{
         int n;
         String attr;
-        in.nextToken();
-        in.nextToken();
-        n = (int)in.nval;
+        in.next();
+        n = in.nextInt();
         for(int i = 0; i < n; i++){
-            in.nextToken();
-            attr = in.sval;
-            in.nextToken();
+            attr = in.next();
             if(attr.equals("Faction")){
-                Faction = (int)in.nval;
+                Faction = in.nextInt();
             }else if(attr.equals("PositionX")){
-                PositionX = (float)in.nval;
+                PositionX = in.nextFloat();
             }else if(attr.equals("PositionY")){
-                PositionY = (float)in.nval;
+                PositionY = in.nextFloat();
             }else if(attr.equals("VelocityX")){
-                VelocityX = (float)in.nval;
+                VelocityX = in.nextFloat();
             }else if(attr.equals("VelocityY")){
-                VelocityY = (float)in.nval;
+                VelocityY = in.nextFloat();
             }else if(attr.equals("DirectionX")){
-                DirectionX = (float)in.nval;
+                DirectionX = in.nextFloat();
             }else if(attr.equals("DirectionY")){
-                DirectionY = (float)in.nval;
+                DirectionY = in.nextFloat();
             }else if(attr.equals("CurrentSpeed")){
-                CurrentSpeed = (float)in.nval;
+                CurrentSpeed = in.nextFloat();
             }else if(attr.equals("IsBlocked")){
-                IsBlocked = Boolean.parseBoolean(in.sval);
+                /* IsBlocked = in.nextBoolean(); */
+                IsBlocked = Boolean.parseBoolean(in.next());
             }else if(attr.equals("IsRotating")){
-                IsRotating = Boolean.parseBoolean(in.sval);
+                IsRotating = Boolean.parseBoolean(in.next());
             }else if(attr.equals("IsMoving")){
-                IsMoving = Boolean.parseBoolean(in.sval);
+                IsMoving = Boolean.parseBoolean(in.next());
             }else if(attr.equals("Rotation")){
-                Rotation = (float)in.nval;
+                Rotation = in.nextFloat();
             }else if(attr.equals("Armor")){
-                Armor = (float)in.nval;
+                Armor = in.nextFloat();
             }else if(attr.equals("CooldownRemain")){
                 CooldownRemain = new float[2];
-                CooldownRemain[0] = (float)in.nval;
-                in.nextToken();
-                CooldownRemain[1] = (float)in.nval;
+                CooldownRemain[0] = in.nextFloat();
+                CooldownRemain[1] = in.nextFloat();
             }else if(attr.equals("CurrentSpeed")){
-                CurrentSpeed = (float)in.nval;
+                CurrentSpeed = in.nextFloat();
             }else if(attr.equals("ID")){
-                ID = (int)in.nval;
+                ID = in.nextInt();
             }else{
                 System.out.println("Unknown attribute: "+attr);
             }

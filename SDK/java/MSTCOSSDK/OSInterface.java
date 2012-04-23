@@ -2,6 +2,7 @@
 import java.util.List;
 import java.util.ArrayList;
 import java.io.*;
+import java.util.Scanner;
 
 public class OSInterface{
     public static float MaxArmor = 1000;
@@ -27,11 +28,11 @@ public class OSInterface{
 
     //private fields
     private boolean _running;
-    StreamTokenizer in;
+    Scanner in;
     OutputStreamWriter out;
 
     // methods 
-    public OSInterface(StreamTokenizer in_, OutputStreamWriter out_){
+    public OSInterface(Scanner in_, OutputStreamWriter out_){
         _running = true;
         in = in_;
         out = out_;
@@ -97,31 +98,16 @@ public class OSInterface{
     }
     public void update() throws IOException{
         String attr, value;
-        in.nextToken();
-        in.nextToken();
-        int n = (int)in.nval;
+        in.next();
+        int n = in.nextInt();
         for(int i = 0; i < n; i++){
-            in.nextToken();
-            attr = in.sval;
-            /* //print */
-            /* if(in.ttype == in.TT_WORD) */
-            /*     print(attr); */
-            /* else if(in.ttype == in.TT_NUMBER) */
-            /*     print(""+in.nval); */
-
-            in.nextToken();
-            /* //print */
-            /* if(in.ttype == in.TT_WORD) */
-            /*     print(attr); */
-            /* else if(in.ttype == in.TT_NUMBER) */
-            /*     print(""+in.nval); */
-
+            attr = in.next();
             if(attr.equals("Faction")){
-                Faction = (int)in.nval;
+                Faction = in.nextInt();
             }else if(attr.equals("Running")){
-                _running = Boolean.parseBoolean(in.sval);
+                _running = Boolean.parseBoolean(in.next());
             }else if(attr.equals("Resource")){
-                int n1 = (int)in.nval;
+                int n1 = in.nextInt();
                 Resource.clear();
                 for(int j = 0; j < n1; j++){
                     ResourceInfo r = new ResourceInfo();
@@ -129,7 +115,7 @@ public class OSInterface{
                     Resource.add(r);
                 }
             }else if(attr.equals("Ship")){
-                int n1 = (int)in.nval;
+                int n1 = in.nextInt();
                 print("n2="+n1);
                 Resource.clear();
                 for(int j = 0; j < n1; j++){
