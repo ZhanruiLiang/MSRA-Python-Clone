@@ -14,11 +14,12 @@ class ResourceInfo:
         attrs = {
                 'ID': r.id,
                 'Faction': r.faction,
-                'PositinX': r.position.x,
-                'PositinY': r.position.y
+                'PositionX': r.position.x,
+                'PositionY': r.position.y
                 }
-        info = 'ResourceInfo{} %d\n%s' %(len(attrs), 
+        info = 'ResourceInfo %d\n%s' %(len(attrs), 
                 '\n'.join('%s %s' % (k, v) for k, v in attrs.iteritems()))
+        return info
 
 class Resource(pygame.sprite.Sprite):
     IslandColor = Color(0, 0x55, 0, 0xff)

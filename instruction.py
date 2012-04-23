@@ -1,6 +1,7 @@
 
 class Instruction:
     def __init__(self, sender, rawstr):
+        print 'rawstr:[%s]' % rawstr
         args = rawstr.split()
         cmd, sec = args[:2]
         args = args[2:]

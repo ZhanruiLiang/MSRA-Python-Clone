@@ -7,9 +7,9 @@ font = pygame.font.SysFont('monospace', 16)
 Transparent = (0, 0, 0, 0)
 
 class PyeventHandler:
-    def handle(self):
+    def handle(self, event):
         pass
-    def step(sefl):
+    def step(self):
         pass
 
 class Button(Sprite, PyeventHandler):

@@ -3,6 +3,8 @@ import pygame
 import dashboard
 import visual
 import math
+import socket
+from socket import socket as Socket
 from events import *
 from pygame.locals import *
 from player import Player, HumanPlayer
@@ -31,6 +33,7 @@ def sprite_cmp(s1, s2):
 class Shippo:
     W = config.W
     H = config.H
+    SpeedUp = 2
     FPS = 30
     LFPS = 60 # logic frame per sec
     SeaColor = (0, 0x55, 0xff, 0xff)
@@ -50,12 +53,12 @@ class Shippo:
         self.ships = []
         self.resources = []
         self.dashBoard = dashboard.DashBoard(self.BoardPos, self.BoardSize)
+        self.statusBoard = dashboard.StatsBoard()
         self.events = []
         self.UISprites = []
         self.visualSprites = []
 
         self.needQuit = 0
-        self.currentSec = 0
         self.running = False
         self.renderCnt = 0
 
@@ -74,9 +77,10 @@ class Shippo:
         # apply an instruction
         cmd = inst.cmd
         args = inst.args
-        print 'apply', inst
         if cmd == 'MoveTo':
             self.ins_move_to(inst.faction, int(args[0]), float(args[1]), float(args[2]))
+        elif cmd == 'Data':
+            self.ins_data(inst.faction)
         elif cmd == 'Attack':
             self.ins_attack(inst.faction, int(args[0]), int(args[1]))
         elif cmd == 'StartRotating':
@@ -91,7 +95,7 @@ class Shippo:
             self.ins_start_rotating_to(inst.faction, int(args[0]), float(args[1]), float(args[2]))
         else:
             # invalid command
-            print 'Unknown instruction %s' % inst
+            self.inform('Unknown instruction %s' % inst)
 
     def to_rawstr(self, faction):
         # generate the info to player specified by playerId
@@ -109,13 +113,13 @@ class Shippo:
             else:
                 shipInfos.append(ShipInfo(ship))
         lines = []
-        lines.append("OSInterface %d" % (2 + len(shipInfos) + len(resourceInfos)))
+        lines.append("OSInterface %d" % (4))
         lines.append("Faction %d" %(faction,))
         lines.append("Running %s" %(self.running,))
         lines.append("Resource %d" %(len(resourceInfos),))
         for info in resourceInfos:
             lines.append("%s" % info.to_rawstr())
-        lines.append("  Ship %d" %(len(shipInfos),))
+        lines.append("Ship %d" %(len(shipInfos),))
         for info in shipInfos:
             lines.append("%s" % info.to_rawstr())
         lines.append("")
@@ -135,6 +139,11 @@ class Shippo:
         ship.moving = True
         ship.rotating = True
         return True
+
+    def ins_data(self, faction):
+        data = self.to_rawstr(faction)
+        player = self.players[faction - 1]
+        player.send_data(self)
 
     def ins_attack(self, faction, shipId1, shipId2):
         ship1 = self.get_ship_by_id(shipId1)
@@ -171,6 +180,15 @@ class Shippo:
         ship.moving = True
         return True
 
+    def ins_stop_moving(self, faction, shipId):
+        # stop both moving and rotating
+        ship = self.get_ship_by_id(shipId)
+        if ship is None or ship.faction != faction:
+            return False
+        ship.moving = False
+        ship.moveTarget = None
+        return True
+
     def ins_stop(self, faction, shipId):
         # stop both moving and rotating
         ship = self.get_ship_by_id(shipId)
@@ -192,6 +210,7 @@ class Shippo:
         return True
 
     def render(self):
+        self.renderTimer.tick()
         screen = self.screen
         viewBox = self.viewBox
         # draw the sea
@@ -202,7 +221,7 @@ class Shippo:
         # draw the white border
         w, h = (config.MapWidth, config.MapHeight)
         rect = pygame.Rect((0, 0), (viewBox.lenWorld2screen(w), viewBox.lenWorld2screen(h)))
-        rect.topleft = viewBox.posWorld2screen(rect.topleft)
+        rect.center = viewBox.posWorld2screen((0, 0))
         pygame.draw.rect(screen, (0x7f, 0x7f, 0x7f, 0x30), rect, 1)
 
         # update sprites
@@ -250,6 +269,9 @@ class Shippo:
             dash.update()
         screen.blit(dash.image, dash.rect)
 
+        self.statusBoard.update()
+        screen.blit(self.statusBoard.image, self.statusBoard.rect)
+
         # draw UI sprites
         for sp in self.UISprites:
             if sp.visible:
@@ -270,7 +292,16 @@ class Shippo:
         print msg
 
     def wait_connect(self):
-        player1 = Player(1, config.Port + 1)
+        server = Socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            server.bind(('', config.Port))
+        except socket.error as e:
+            print e
+            sleep(1)
+        server.listen(2)
+        server.settimeout(0.0)
+
+        player1 = Player(1, server)
         player2 = HumanPlayer(2)
         self.pyeventHandlers.append(player2)
         players = [player1, player2, None]
@@ -279,28 +310,37 @@ class Shippo:
         # wait until connected 2 players
         finished = 0
         player = players[finished]
-        while finished < 2:
-            self.inform('waiting for AI to connect...')
-            for event in pygame.event.get():
-                if event.type == QUIT:
-                    self.quit()
-                    break
-            if self.needQuit: break
-            if player.connect():
-                self.add_player(player)
-                self.inform('AI %s connected' % (player.name))
-                finished += 1
-                player = players[finished]
-            # self.render()
-            timer.tick(self.FPS)
+        try:
+            while finished < 2:
+                self.inform('waiting for AI to connect...')
+                for event in pygame.event.get():
+                    if event.type == QUIT:
+                        self.quit()
+                        break
+                if self.needQuit: break
+                if player.connect():
+                    self.add_player(player)
+                    self.inform('AI %s connected' % (player.name))
+                    finished += 1
+                    player = players[finished]
+                # self.render()
+                timer.tick(20)
+        except KeyboardInterrupt:
+            server.close()
+            return False
+        return True
 
     def setup_level(self, level=0):
-        self.background = visual.Background('sea.jpg')
+        self.background = visual.Background('sea_wrap.png')
 
         p0 = Vec2d(250, 900)
         p1 = Vec2d(config.MapWidth - p0.x, p0.y)
         p2 = Vec2d(600, 600)
         p3 = Vec2d(config.MapWidth - p2.x, config.MapHeight - p2.y)
+        p0 = Vec2d(-750, -100)
+        p1 = Vec2d(750 , p0.y)
+        p2 = Vec2d(-400, -400)
+        p3 = Vec2d(400, 400)
 
         dh = 40
         level0 = {'rPoss':[(p2.x, p2.y), (p2.x, p3.y), (p3.x, p2.y), (p3.x, p3.y), (p2+p3)/2],
@@ -325,9 +365,7 @@ class Shippo:
             self.ships.append(ship)
             self.pyeventHandlers.append(ship.button)
             id += 1
-        # add dashboard for player1
-        dash = dashboard.ShipStatus(self.SubBoardSize, player)
-        self.dashBoard.add_board(dash)
+
         # add ship for player 2
         player = self.players[1]
         for pos in level0['sPoss2']:
@@ -338,9 +376,11 @@ class Shippo:
             self.ships.append(ship)
             self.pyeventHandlers.append(ship.button)
             id += 1
-        # add dashboard for player2
-        dash = dashboard.ShipStatus(self.SubBoardSize, player)
-        self.dashBoard.add_board(dash)
+
+        # add dahsboard for player
+        for player in self.players:
+            dash = dashboard.ShipStatus(self.SubBoardSize, player)
+            self.dashBoard.add_board(dash)
 
         # add ship detail board
         self.detailBoard = dashboard.ShipDetailStatus()
@@ -350,7 +390,11 @@ class Shippo:
         self.viewControl = ViewControl(self)
         self.pyeventHandlers.append(self.viewControl)
 
-        self.viewBox.zoom((self.W/2, self.H/2), -0.4)
+        self.viewBox.zoom((0, 0), -0.4)
+        self.viewBox.move_to((0, 0))
+
+        # add render timer
+        self.renderTimer = pygame.time.Clock()
 
     def handle_pyevents(self):
         for event in pygame.event.get():
@@ -371,27 +415,22 @@ class Shippo:
                 inst = player.fetch_instruction()
                 if inst is None: 
                     break
-                # if inst.sec != self.currentSec:
-                #     continue
                 # apply the instruction, maybe not success
                 self.apply_instruction(inst)
                 done = True
-        for player in self.players:
-            player.iteration(self)
 
     def mainloop(self):
         # start game
         self.t = 0.
         self.running = True
 
-        renderDt = 1.0/self.FPS
+        renderDt = 1.0/self.FPS*self.SpeedUp
         instDt = 1.0/config.MaxInstPerSec
         eventDt = 1.0/self.FPS
         logicDt = 1.0/self.LFPS
 
         timer = pygame.time.Clock()
         timer1 = pygame.time.Clock()
-        self.currentSec = 0
         # accuCallbacks, add by order
         self.register_accumulate_callback(eventDt, self.handle_pyevents)
         self.register_accumulate_callback(instDt, self.accept_insts)
@@ -405,13 +444,12 @@ class Shippo:
                     self.visualSprites.append(effect)
         self.register_accumulate_callback(0.1, add_visual_effect)
 
-        # def clear_instructions():
-        #     for player in self.players:
-        #         player.clear()
-        # self.register_accumulate_callback(1.0, clear_instructions)
+        def update_status():
+            sec = max(int(self.timeLimit - self.t), 0)
+            self.statusBoard.update_info('FPS %.1f PFPS: %.1f TIME LEFT: %02d:%02d' %(self.renderTimer.get_fps(), timer.get_fps(), sec/60, sec % 60))
+        self.register_accumulate_callback(1.0, update_status)
 
         while not self.needQuit:
-            self.currentSec = self.t
             timer1.tick()
             # try activate accumulate callbacks
             for acb in self.accuCallbacks:
@@ -421,7 +459,8 @@ class Shippo:
                     callback()
             if self.needQuit: break
             # game logic
-            dt = logicDt - timer1.tick()/1000
+            # dt = (logicDt - timer1.tick()/1000) * self.SpeedUp
+            dt = logicDt * self.SpeedUp
             self.step(dt)
             if self.needQuit: break
             for acb in self.accuCallbacks:
@@ -482,8 +521,9 @@ class Shippo:
             dp = obj2.position - obj1.position
             R = (obj1.hitRadius + obj2.hitRadius)
             dpnor = dp.normalized()
-            # if isinstance(obj2, Ship) and obj2.faction != obj1.faction:
-            if isinstance(obj2, Ship):
+            # hit damage detection
+            if isinstance(obj2, Ship) and obj2.faction != obj1.faction:
+            # if isinstance(obj2, Ship):
                 dv = obj1.velocity - obj2.velocity
                 if dv.dot(dpnor) > 7.5 and dpnor.dot(obj1.direction.normalized()) >= 0.8660254037: # sqrt(3)/2
                     hitDamage = obj1.direction.dot(dv) * 14 + 100
@@ -491,13 +531,14 @@ class Shippo:
                     self.add_event(ShipDamage(event.time, obj1, hitDamage/2))
                     self.visualSprites.append(visual.ExplodeEffect((obj1.position + obj2.position)/2, hitDamage))
                     # print '%d hit %d, damage %s' %(obj1.id, obj2.id, hitDamage)
-                obj1.position -= (R - dp.length)/2 * dpnor
-                obj2.position += (R - dp.length)/2 * dpnor
+                obj1.position -= (2 + R - dp.length)/2 * dpnor
+                obj2.position += (2 + R - dp.length)/2 * dpnor
             else:
                 obj1.position -= (R - dp.length) * dpnor
             v1 = obj1.velocity
             v1 -= dpnor * dpnor.dot(v1)
-            # v1 *= 0.9
+            # v1 *= 0
+            # v1 *= 0.2
 
             obj1.blocked = 1
         elif isinstance(event, ShipDamage):
@@ -584,6 +625,13 @@ class Shippo:
             if recover:
                 for ship in player.ships:
                     ship.armor = min(ship.armor + recover, config.MaxArmor)
+        # out side damage
+        w = config.MapWidth/2
+        h = config.MapHeight/2
+        for ship in self.ships:
+            x, y = ship.position
+            if x < -w or x > w  or x <-h or x > h:
+                self.add_event(ShipDamage(self.t, ship, 25 * dt0))
         # resource distribute
         for res in self.resources:
             del res.ships[:]
@@ -595,6 +643,10 @@ class Shippo:
                 col = res.boundingColor
                 col1 = self.players[res.faction-1].color
                 col.r, col.g, col.b = col1.r, col1.g, col1.b
+        # event handle
+        while events and events[0].time <= self.t:
+            e = heappop(events)
+            self.handle_event(e)
         # test gameover
         if self.winScreen is None:
             self.test_gameover()

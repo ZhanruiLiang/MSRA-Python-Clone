@@ -87,6 +87,8 @@ S-LClick: select add
 RClick: moveTo / attack
 C-RClick: rotateTo
 [S-]1,2,3,4,5: select
+Space: stop
+S-Space: stop rotating
 
 View Control
 ---------------

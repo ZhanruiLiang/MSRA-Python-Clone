@@ -26,8 +26,8 @@ class ShipInfo:
                 'ID': s.id,
                 'Faction': s.faction,
                 'Armor': s.armor,
-                'PositinX': s.position.x,
-                'PositinY': s.position.y,
+                'PositionX': s.position.x,
+                'PositionY': s.position.y,
                 'VelocityX': s.velocity.x,
                 'VelocityY': s.velocity.y,
                 'CurrentSpeed': s.velocity.length,
@@ -39,14 +39,14 @@ class ShipInfo:
                 'IsRotating': s.isRotating,
                 'CooldownRemain': ' '.join(str(i) for i in s.cooldownRemain)
                 }
-        info = 'ShipInfo{} %d\n%s' %(len(attrs), 
+        info = 'ShipInfo %d\n%s' %(len(attrs), 
                 '\n'.join('%s %s' % (k, v) for k, v in attrs.iteritems()))
         return info
 
 class Ship(Sprite):
     color = (0, 0, 0x50, 0xff)
     FanColor = (0, 0, 0, 0xff)
-    ImgRadius = config.ShipBoundingRadius * 2
+    ImgRadius = config.ShipBoundingRadius * 3
     def __init__(self, id, faction, pos, **args):
         self.layer = 10
         self.faction = faction
@@ -71,10 +71,6 @@ class Ship(Sprite):
         # rotateTarget is a float or a tuple (float, float)
         self.rotateTarget = None
 
-        self.rect = pygame.Rect((0, 0), (2*self.ImgRadius,)*2)
-        self.image = pygame.Surface(self.rect.size).convert_alpha()
-        self.rect.center = self.position
-
         self._lastScale = None
         self._lastAngle = self.direction.angle
 
@@ -88,19 +84,27 @@ class Ship(Sprite):
         return 'Ship(id=%s, %s)' % (self.id, self.position)
 
     def draw_body(self, viewBox):
-        R = viewBox.lenWorld2screen(self.ImgRadius)
-        p0x, p0y = (R, R)
-        downPart = [(-R+2, R/8), (-R/4, R/4), (R/3, R/3), (R - 2, R/6)]
-        upPart = [(x, -y) for x, y in downPart][::-1]
-        poly = [(p0x + x, p0y + y) for x, y in downPart + upPart]
-        R = int(R)
-        r0 = int(config.ShipBoundingRadius)
-        self.image.fill(Transparent)
-        # pygame.draw.circle(self.image, (0x0, 0, 0xff, 0xff), (R, R), int(viewBox.lenWorld2screen(r0)), 
-        #         max(int(viewBox.lenWorld2screen(3)), 1))
-        pygame.draw.circle(self.image, (0x0, 0, 0xff, 0x8f), (R, R), int(viewBox.lenWorld2screen(r0)))
-        pygame.draw.polygon(self.image, self.color, poly)
-        pygame.draw.rect(self.image, self.FanColor, pygame.Rect((R, 0), (viewBox.lenWorld2screen(5), R*2)))
+        r = viewBox.lenWorld2screen(self.ImgRadius)
+        imgSize = (r*2, )*2
+        self.rect = pygame.Rect((0, 0), imgSize)
+        png = pygame.image.load('ship1short.png').convert_alpha()
+        self.image = pygame.transform.smoothscale(png , self.rect.size)
+        self.image.fill(self.color, None, pygame.BLEND_RGBA_MULT)
+        self.rect.center = viewBox.posWorld2screen(self.position)
+
+        # R = viewBox.lenWorld2screen(self.ImgRadius)
+        # p0x, p0y = (R, R)
+        # downPart = [(-R+2, R/8), (-R/4, R/4), (R/3, R/3), (R - 2, R/6)]
+        # upPart = [(x, -y) for x, y in downPart][::-1]
+        # poly = [(p0x + x, p0y + y) for x, y in downPart + upPart]
+        # R = int(R)
+        # r0 = int(config.ShipBoundingRadius)
+        # self.image.fill(Transparent)
+        # # pygame.draw.circle(self.image, (0x0, 0, 0xff, 0xff), (R, R), int(viewBox.lenWorld2screen(r0)), 
+        # #         max(int(viewBox.lenWorld2screen(3)), 1))
+        # pygame.draw.circle(self.image, (0x0, 0, 0xff, 0x8f), (R, R), int(viewBox.lenWorld2screen(r0)))
+        # pygame.draw.polygon(self.image, self.color, poly)
+        # pygame.draw.rect(self.image, self.FanColor, pygame.Rect((R, 0), (viewBox.lenWorld2screen(5), R*2)))
 
     @property
     def isMoving(self):
@@ -122,9 +126,6 @@ class Ship(Sprite):
         # if scale change then redraw
         redrawwed = 0
         if self._lastScale != viewBox.scale:
-            r = viewBox.lenWorld2screen(self.ImgRadius)
-            self.rect = pygame.Rect((0, 0), (r*2,)*2)
-            self.image = pygame.Surface(self.rect.size).convert_alpha()
             self.draw_body(viewBox)
             self._lastScale = viewBox.scale
             self._lastAngle = 0
@@ -198,6 +199,8 @@ class Ship(Sprite):
             vnew = self.velocity + self.direction * a * dt
             if vnew.length < config.MaxSpeed:
                 self.velocity = vnew
+            else:
+                self.velocity = vnew.normalized() * config.MaxSpeed
         elif self.velocity.length != 0:
             dv = -self.velocity.normalized() * config.StopDeccelarate * dt
             if dv.length >= self.velocity.length:

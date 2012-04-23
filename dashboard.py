@@ -111,8 +111,8 @@ class HPRecorder:
         self.hp2 = ship.armor
         self.t = 0
         self.dt = 1.0/self.FPS
-        self.maxT1 = 0.5
-        self.maxT2 = 0.8
+        self.maxT1 = 0.7
+        self.maxT2 = 1.2
         self.dhp = 0
 
     def update(self, image, basePos, width, height):
@@ -209,9 +209,10 @@ class ShipStatus(SubBoard):
         colors = (self.dotColor0, self.dotColor1)
         for ship in ships:
             y0, y1, y2 = y, y + r1 * 2, y + r1 * 4
-            draw.circle(self.image, colors[int(ship.isMoving)], (x, y0), r2)
-            draw.circle(self.image, colors[int(ship.isBlocked)], (x, y1), r2)
-            draw.circle(self.image, colors[int(ship.isRotating)], (x, y2), r2)
+            if ship.armor >= 0:
+                draw.circle(self.image, colors[int(ship.isMoving)], (x, y0), r2)
+                draw.circle(self.image, colors[int(ship.isBlocked)], (x, y1), r2)
+                draw.circle(self.image, colors[int(ship.isRotating)], (x, y2), r2)
             x += r1 * 2 + self.barMargin
 
 class DashBoard:
@@ -239,3 +240,19 @@ class DashBoard:
         for board in self.boards:
             board.update()
             self.image.blit(board.image, board.rect)
+
+class StatsBoard:
+    def __init__(self):
+        self.info = None
+        self.font = pygame.font.SysFont('monospace', 16, bold=True)
+        self.update_info('')
+
+    def update(self):
+        pass
+
+    def update_info(self, info):
+        if self.info != info:
+            self.info = info
+            w, h = self.font.size(info)
+            self.image = self.font.render(info, 1, Color("white"))
+            self.rect = Rect((2, 2), (w, h))

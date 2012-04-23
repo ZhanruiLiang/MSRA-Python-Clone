@@ -1,11 +1,11 @@
 W, H = 1024, 700
 speedup = 1.
-Port = 55000
+Port = 55001
 MaxInstPerSec = 10
 MaxArmor = 1000.
 Acceleration = 10. * speedup # 10
 MaxSpeed = 25. * speedup # 25
-AngularRate = 45. * speedup# 60
+AngularRate = 45. * speedup
 ShipBoundingRadius = 15.
 IslandBoundingRadius = 32.
 CannonSpan = 4. / speedup

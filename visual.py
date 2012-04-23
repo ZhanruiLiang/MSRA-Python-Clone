@@ -28,8 +28,8 @@ class Background(Sprite):
         ssize = config.W, config.H
         ssize = ssize[0] + size[0], ssize[1] + size[1]
         image = pygame.Surface(ssize).convert_alpha()
-        for x in xrange(0, ssize[0], size[0]):
-            for y in xrange(0, ssize[1], size[1]):
+        for x in xrange(0, ssize[0]+1, size[0]):
+            for y in xrange(0, ssize[1]+1, size[1]):
                 image.blit(texture, (x, y))
         self.image = image
         self.ssize = ssize
@@ -41,7 +41,7 @@ class Background(Sprite):
         x, y = viewBox.posWorld2screen(self._pos)
         w0, h0 = self.tsize
         x = x % w0 - w0
-        y = y % w0 - w0
+        y = y % h0 - h0
         self.rect.topleft = x, y
 
 class VisualEffect(Sprite):
@@ -94,7 +94,8 @@ class SelectedShip(VisualEffect):
         rect = self.ship.rect
         self.image = pygame.Surface(rect.size).convert_alpha()
         self.image.fill(Transparent)
-        pygame.draw.circle(self.image, (0xff, 0xff, 0, 0x55), (rect.width/2, rect.height/2), rect.width/3, 5)
+        pygame.draw.circle(self.image, (0xff, 0xff, 0, 0x55),
+                (rect.width/2, rect.height/2), rect.width/3, min(5, rect.width/3))
         self.rect = rect
 
     def step(self, dt):
