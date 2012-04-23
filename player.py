@@ -127,7 +127,7 @@ class HumanPlayer(Player):
 
     def mark_attack_er(self, target):
         def mark_attack(event):
-            for ship in self.selected:
+            for ship, sp in self.selected:
                 self.instructions.append('Attack %d %d %d' % (self.shippo.t, ship.id, target.id))
                 self.marked = 1
             return True
@@ -154,13 +154,14 @@ class HumanPlayer(Player):
 
     def select(self, ship, add=0):
         if self.shippo:
-            if add:
-                self.selected.add(ship)
-            else:
-                for ship1 in self.selected:
-                    del self.shippo.visualSprites[:]
-            self.selected = set([ship])
-            self.shippo.visualSprites.append(visual.SelectedShip(ship))
+            sp = visual.SelectedShip(ship)
+            if not add:
+                visualSprites = self.shippo.visualSprites
+                for ship1, sp1 in self.selected:
+                    visualSprites.remove(sp1)
+                self.selected.clear()
+            self.selected.add((ship, sp))
+            self.shippo.visualSprites.append(sp)
             self.shippo.detailBoard.update_target(ship)
             self.shippo.viewBox.follow(ship)
 
@@ -171,7 +172,7 @@ class HumanPlayer(Player):
             if event.button == 3: # RClick
                 if pygame.key.get_mods() & pygame.KMOD_CTRL:
                     # print 'C-Rclick'
-                    for ship in self.selected:
+                    for ship,sp in self.selected:
                         # self.instructions.append(
                         #         'StartRotatingTo %d %d %.2f %.2f' % (self.shippo.t, ship.id, worldX, worldY))
                         epos = self.shippo.viewBox.posScreen2world(event.pos)
@@ -187,17 +188,17 @@ class HumanPlayer(Player):
                                         'Attack %d %d %d' % (self.shippo.t, ship.id, 0))
                 else:
                     # print 'Rclick'
-                    for ship in self.selected:
+                    for ship,sp in self.selected:
                         self.instructions.append(
                                 'MoveTo %d %d %.2f %.2f' % (self.shippo.t, ship.id, worldX, worldY))
         elif et == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 if event.mod & pygame.KMOD_SHIFT:
-                    for ship in self.selected:
+                    for ship, sp in self.selected:
                         self.instructions.append(
                                 'StopRotating %d %d' % (self.shippo.t, ship.id))
                 else:
-                    for ship in self.selected:
+                    for ship, sp in self.selected:
                         self.instructions.append(
                                 'Stop %d %d' % (self.shippo.t, ship.id))
             elif event.key in (K_1, K_2, K_3, K_4, K_5):
@@ -207,7 +208,7 @@ class HumanPlayer(Player):
                     if ship.id == id:
                         self.select(ship, add)
             elif event.key == K_c:
-                for ship in self.selected:
+                for ship,sp in self.selected:
                     ship._show_debug = not ship._show_debug
             elif event.key == K_a and event.mod & KMOD_CTRL:
                 for ship in self.ships:
@@ -216,6 +217,7 @@ class HumanPlayer(Player):
     def fetch_instruction(self):
         if self.instructions:
             instruction = Instruction(self, self.instructions.pop(0))
+            print instruction
         else:
             instruction = None
         return instruction

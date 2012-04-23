@@ -49,7 +49,6 @@ public class OSInterface{
         if(sendInstruction("Data", args)){
             try{
                 update();
-                System.out.println("updated");
             }catch(IOException ioException){
                 ioException.printStackTrace();
                 System.out.println("error, data can not be updated!");
@@ -116,7 +115,6 @@ public class OSInterface{
                 }
             }else if(attr.equals("Ship")){
                 int n1 = in.nextInt();
-                print("n2="+n1);
                 Resource.clear();
                 for(int j = 0; j < n1; j++){
                     ShipInfo ship = new ShipInfo();
@@ -127,7 +125,6 @@ public class OSInterface{
                 print("Unknown attribute: "+attr);
             }
         }
-        print("<<<-------------");
     }
     public boolean sendInstruction(String cmd, String[] args){
         StringBuilder sbuilder = new StringBuilder();
@@ -140,7 +137,6 @@ public class OSInterface{
         try{
             out.write(inst);
             out.flush();
-            System.out.println("sent: "+inst);
         }catch(IOException ioException){
             ioException.printStackTrace();
             System.out.println("error, send instruction failed!");

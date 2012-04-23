@@ -15,6 +15,7 @@ from viewBox import ViewBox
 from viewControl import ViewControl
 from heapq import heappush, heappop
 from win import WinScreen
+from time import sleep
 
 
 class Instruction:
@@ -33,7 +34,7 @@ def sprite_cmp(s1, s2):
 class Shippo:
     W = config.W
     H = config.H
-    SpeedUp = 2
+    SpeedUp = 5
     FPS = 30
     LFPS = 60 # logic frame per sec
     SeaColor = (0, 0x55, 0xff, 0xff)

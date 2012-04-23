@@ -123,7 +123,6 @@ class HPRecorder:
                 self.hp2 = self.hp1
                 self.hp1 = self.ship.armor
                 self.t = 0
-                print 'new damage', self.hp1, self.hp2
             else:
                 self.hp1 = self.ship.armor
         if self.t < self.maxT1:
