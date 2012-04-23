@@ -16,17 +16,8 @@ from viewControl import ViewControl
 from heapq import heappush, heappop
 from win import WinScreen
 from time import sleep
+from instruction import Instruction
 
-
-class Instruction:
-    """Every """
-    def __init__(self, rawstr):
-        args = rawstr.split()
-        cmd, sec = args[:2]
-        args = args[2:]
-        self.cmd = cmd
-        self.sec = sec
-        self.args = args
 
 def sprite_cmp(s1, s2):
     return cmp(s1.layer, s2.layer)
@@ -34,9 +25,9 @@ def sprite_cmp(s1, s2):
 class Shippo:
     W = config.W
     H = config.H
-    SpeedUp = 5
+    SpeedUp = 1
     FPS = 30
-    LFPS = 60 # logic frame per sec
+    LFPS = 30 # logic frame per sec
     SeaColor = (0, 0x55, 0xff, 0xff)
     BoardSize = (270, H-4)
     BoardPos = (W - 270 - 2, 2)
@@ -76,6 +67,7 @@ class Shippo:
 
     def apply_instruction(self, inst):
         # apply an instruction
+        print 'apply:',inst
         cmd = inst.cmd
         args = inst.args
         if cmd == 'MoveTo':
@@ -136,7 +128,7 @@ class Shippo:
         ship = self.get_ship_by_id(shipId)
         if ship is None or ship.faction != faction:
             return False
-        ship.moveTarget = Vec2d(x, y)
+        ship.rotateTarget = ship.moveTarget = Vec2d(x, y)
         ship.moving = True
         ship.rotating = True
         return True
@@ -152,8 +144,10 @@ class Shippo:
             return False
         ship2 = self.get_ship_by_id(shipId2)
         # attack
-        ship1.attackTarget = ship2
-        return True
+        if not ship2 or ship2.faction != ship1.faction:
+            ship1.attackTarget = ship2
+            return True
+        return False
 
     def ins_start_rotating(self, faction, shipId, angle):
         ship = self.get_ship_by_id(shipId)
@@ -215,9 +209,10 @@ class Shippo:
         screen = self.screen
         viewBox = self.viewBox
         # draw the sea
-        screen.fill((0, 0, 0, 0xff))
-        self.background.update(viewBox)
-        screen.blit(self.background.image, self.background.rect)
+        screen.fill(self.SeaColor)
+        # screen.fill((0, 0, 0, 0xff))
+        # self.background.update(viewBox)
+        # screen.blit(self.background.image, self.background.rect)
 
         # draw the white border
         w, h = (config.MapWidth, config.MapHeight)
@@ -293,16 +288,22 @@ class Shippo:
         print msg
 
     def wait_connect(self):
+        test = 0
         server = Socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            server.bind(('', config.Port))
-        except socket.error as e:
-            print e
-            sleep(1)
-        server.listen(2)
-        server.settimeout(0.0)
+        if not test:
+            while 1:
+                try:
+                    server.bind(('', config.Port))
+                    break
+                except socket.error as e:
+                    print e
+                    sleep(1)
+            server.listen(2)
+            server.settimeout(0.0)
 
-        player1 = Player(1, server)
+            player1 = Player(1, server)
+        else:
+            player1 = HumanPlayer(1)
         player2 = HumanPlayer(2)
         self.pyeventHandlers.append(player2)
         players = [player1, player2, None]
@@ -329,9 +330,12 @@ class Shippo:
         except KeyboardInterrupt:
             server.close()
             return False
+        server.close()
+
         return True
 
     def setup_level(self, level=0):
+        if self.needQuit: return
         self.background = visual.Background('sea_wrap.png')
 
         p0 = Vec2d(250, 900)
@@ -537,8 +541,8 @@ class Shippo:
             else:
                 obj1.position -= (R - dp.length) * dpnor
             v1 = obj1.velocity
-            v1 -= dpnor * dpnor.dot(v1)
-            # v1 *= 0
+            # v1 -= dpnor * dpnor.dot(v1)
+            v1 *= 0
             # v1 *= 0.2
 
             obj1.blocked = 1

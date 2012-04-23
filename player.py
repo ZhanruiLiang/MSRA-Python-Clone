@@ -158,7 +158,8 @@ class HumanPlayer(Player):
             if not add:
                 visualSprites = self.shippo.visualSprites
                 for ship1, sp1 in self.selected:
-                    visualSprites.remove(sp1)
+                    if sp1 in visualSprites:
+                        visualSprites.remove(sp1)
                 self.selected.clear()
             self.selected.add((ship, sp))
             self.shippo.visualSprites.append(sp)
@@ -217,7 +218,6 @@ class HumanPlayer(Player):
     def fetch_instruction(self):
         if self.instructions:
             instruction = Instruction(self, self.instructions.pop(0))
-            print instruction
         else:
             instruction = None
         return instruction

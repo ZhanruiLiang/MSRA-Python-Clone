@@ -47,6 +47,7 @@ class Ship(Sprite):
     color = (0, 0, 0x50, 0xff)
     FanColor = (0, 0, 0, 0xff)
     ImgRadius = config.ShipBoundingRadius * 3
+    Img = None
     def __init__(self, id, faction, pos, **args):
         self.layer = 10
         self.faction = faction
@@ -76,6 +77,8 @@ class Ship(Sprite):
 
         # add button
         self.button = Button(pygame.Rect((0,0), (1,1)), '', 0)
+        if Ship.Img is None:
+            Ship.Img = pygame.image.load('ship1short.png').convert_alpha()
 
     def __hash__(self):
         return self.id
@@ -87,7 +90,7 @@ class Ship(Sprite):
         r = viewBox.lenWorld2screen(self.ImgRadius)
         imgSize = (r*2, )*2
         self.rect = pygame.Rect((0, 0), imgSize)
-        png = pygame.image.load('ship1short.png').convert_alpha()
+        png = self.Img
         self.image = pygame.transform.smoothscale(png , self.rect.size)
         self.image.fill(self.color, None, pygame.BLEND_RGBA_MULT)
         self.rect.center = viewBox.posWorld2screen(self.position)
@@ -133,7 +136,7 @@ class Ship(Sprite):
         self.rect.center = viewBox.posWorld2screen(self.position)
         angle = self.direction.angle
         # if rotated then transform
-        if abs(self._lastAngle - angle) >= 5:
+        if abs(self._lastAngle - angle) >= 3.5:
             if not redrawwed:
                 self.draw_body(viewBox)
                 redrawwed = 1
@@ -148,52 +151,32 @@ class Ship(Sprite):
     def test_world_size(self):
         return (self.hitRadius*2,)*2
 
-    def short_step(self, dt):
-        a = config.Acceleration
-        v0 = self.velocity + (0, 0)
-        if self.moving:
-            self.velocity += self.direction * a * dt
-        else:
-            dv = -self.velocity.normalized() * config.StopDeccelarate * dt
-            if dv.length >= self.velocity.length:
-                self.velocity *= 0
-            else:
-                self.velocity += dv
-        # if not self.blocked:
-        self.position += (self.velocity + v0) * dt
-
     def step(self, dt):
         assert dt > 0
         a = config.Acceleration
         v0 = self.velocity + (0, 0)
-        if self.moveTarget is not None or self.rotateTarget is not None:
+        if self.moveTarget:
+            dp = self.moveTarget - self.position
+            if dp.length < config.StopRange:
+                self.moveTarget = None
+                self.moving = False
+        if self.rotateTarget:
             myAngle = self.direction.angle
-            if self.moveTarget is not None:
-                dp = self.moveTarget - self.position
-                angle = dp.angle
-                da = angle - myAngle
-                if dp.length < config.StopRange:
-                    self.moveTarget = None
-                    self.moving = False
-            elif self.rotateTarget is not None:
-                if isinstance(self.rotateTarget, float):
-                    da = self.rotateTarget - myAngle
-                else:
-                    da = Vec2d(self.rotateTarget - self.position).angle - myAngle
-
+            if isinstance(self.rotateTarget, float):
+                da = self.rotateTarget - myAngle
+            else:
+                da = Vec2d(self.rotateTarget - self.position).angle - myAngle
             if da > 180: da -= 360
             elif da < -180: da += 360
             if abs(da) <= dt * config.AngularRate:
                 self.direction.rotate(da)
+                self.velocity.rotate(da)
                 self.rotating = False
+                self.rotateTarget = None
             elif da:
                 da = da/abs(da) * config.AngularRate * dt
                 self.direction.rotate(da)
-
-            if da > 0:
-                self.velocity += self.velocity.rotated(92) * math.radians(config.AngularRate) * dt
-            else:
-                self.velocity += self.velocity.rotated(-92) * math.radians(config.AngularRate) * dt
+                self.velocity.rotate(da)
 
         if self.moving :
             vnew = self.velocity + self.direction * a * dt

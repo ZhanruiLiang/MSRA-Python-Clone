@@ -35,7 +35,6 @@ public class SDK{
             try{
                 out = new OutputStreamWriter(clientSocket.getOutputStream());
                 out.flush();
-                System.out.println("flush");
 
                 in = new Scanner(clientSocket.getInputStream());
                         /* new BufferedReader( */
