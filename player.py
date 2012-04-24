@@ -42,7 +42,11 @@ class Player:
     def recieve_instructions(self, lock):
         # recieve all instructions sent by the AI
         while 1:
-            inst = self.rfile.readline()
+            try:
+                inst = self.rfile.readline()
+            except socket.error as e:
+                print e
+                inst = ''
             # buf = []
             # while 1:
             #     c = self.rfile.read(1)
@@ -60,9 +64,10 @@ class Player:
             elif inst:
                 inst = inst.rstrip()
                 if config.MSGDEBUG: print '%s recv:[%s]'%(self.name, inst)
-                lock.acquire()
-                self.instructions.append(inst)
-                lock.release()
+                if inst:
+                    lock.acquire()
+                    self.instructions.append(inst)
+                    lock.release()
             sleep(0.05)
 
     def close(self):
