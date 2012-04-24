@@ -54,7 +54,7 @@ void Iteration(OSInterface* const Interface)
 
 int main(int argc, char* argv[])
 {
-    const char* temp[2];
+    char* temp[2];
     temp[0] = "buaacpp";
     temp[1] = "11.22.33";
     srand(0);

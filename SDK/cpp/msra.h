@@ -7,7 +7,7 @@
 using std::cerr;
 #include "PracticalSocket.h"
 #ifdef WIN32
-  #include <dos.h>         // For socket(), connect(), send(), and recv()
+  #include <dos.h>         // For socket(), connect(), send(), && recv()
 #else
   #include <unistd.h>          // For close()
 #endif
@@ -36,7 +36,7 @@ class Scanner{
             char c;
             good = false;
             while(sock.recv(&c, 1) > 0){
-                if(c != ' ' and c != '\n'){
+                if(c != ' ' && c != '\n'){
                     buf.push_back(c);
                 }else if(buf.size() != 0){
                     good = true;
@@ -140,7 +140,7 @@ typedef void (*FIteration)(OSInterface* const Interface);
 class  MSTCOSSDK
 {
 public:
-	static void StartGame(int argc, const char* argv[], FIteration);
+	static void StartGame(int argc, char* argv[], FIteration);
 	OSInterface Interface;
 private:
 	MSTCOSSDK(string host, int port, string name, string color, FIteration Iteration);

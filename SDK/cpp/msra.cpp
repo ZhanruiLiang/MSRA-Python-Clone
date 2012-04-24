@@ -127,13 +127,13 @@ void parseRGB(string rgb, int & r, int & g, int & b){
     for(int j = 0; j < 3; j++){
         p = ps[j];
         *p = 0;
-        for(*p = 0; i < rgb.size() and rgb[i] != '.'; i++){
+        for(*p = 0; i < rgb.size() && rgb[i] != '.'; i++){
             *p = *p * 10 + (i - '0');
         }
     }
 }
 
-void MSTCOSSDK::StartGame(int argc, const char* argv[], FIteration Iteration){
+void MSTCOSSDK::StartGame(int argc, char* argv[], FIteration Iteration){
     string host;
     int port;
     host = "localhost";
