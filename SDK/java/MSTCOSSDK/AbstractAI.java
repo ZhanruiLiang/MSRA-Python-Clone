@@ -1,4 +1,4 @@
-/* package MSTCOSSDK; */
+package MSTCOSSDK;
 
 public abstract class AbstractAI {
     protected final OSInterface Interface;

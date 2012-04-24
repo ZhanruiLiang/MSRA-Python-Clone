@@ -1,4 +1,4 @@
-/* package MSTCOSSDK; */
+package MSTCOSSDK;
 import java.util.List;
 import java.util.ArrayList;
 import java.io.*;
@@ -105,6 +105,8 @@ public class OSInterface{
                 Faction = in.nextInt();
             }else if(attr.equals("Running")){
                 _running = Boolean.parseBoolean(in.next());
+            }else if(attr.equals("TimeLeft")){
+                TimeLeft = in.nextInt();
             }else if(attr.equals("Resource")){
                 int n1 = in.nextInt();
                 Resource.clear();
@@ -115,7 +117,7 @@ public class OSInterface{
                 }
             }else if(attr.equals("Ship")){
                 int n1 = in.nextInt();
-                Resource.clear();
+                Ship.clear();
                 for(int j = 0; j < n1; j++){
                     ShipInfo ship = new ShipInfo();
                     ship.update(in);

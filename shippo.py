@@ -25,7 +25,7 @@ def sprite_cmp(s1, s2):
 class Shippo:
     W = config.W
     H = config.H
-    SpeedUp = 1
+    SpeedUp = 2
     FPS = 30
     LFPS = 30 # logic frame per sec
     SeaColor = (0, 0x55, 0xff, 0xff)
@@ -33,19 +33,12 @@ class Shippo:
     BoardPos = (W - 270 - 2, 2)
     SubBoardSize = (260, 200)
     def __init__(self):
-        pygame.display.init()
-        self.screen = pygame.display.set_mode((self.W, self.H), pygame.DOUBLEBUF, 32)
-        pygame.display.set_caption('MSRA2012 Python version')
-        self.viewBox = ViewBox((self.W, self.H))
         self.reset()
-
 
     def reset(self):
         self.players = []
         self.ships = []
         self.resources = []
-        self.dashBoard = dashboard.DashBoard(self.BoardPos, self.BoardSize)
-        self.statusBoard = dashboard.StatsBoard()
         self.events = []
         self.UISprites = []
         self.visualSprites = []
@@ -61,13 +54,13 @@ class Shippo:
         self.ViewControl = None
         self.winScreen = None
 
-
     def add_player(self, player):
         self.players.append(player)
 
     def apply_instruction(self, inst):
         # apply an instruction
-        print 'apply:',inst
+        # self.inform('apply: %s' % inst)
+        print 'apply:', inst
         cmd = inst.cmd
         args = inst.args
         if cmd == 'MoveTo':
@@ -106,12 +99,15 @@ class Shippo:
             else:
                 shipInfos.append(ShipInfo(ship))
         lines = []
-        lines.append("OSInterface %d" % (4))
+        lines.append("OSInterface %d" % (5))
         lines.append("Faction %d" %(faction,))
         lines.append("Running %s" %(self.running,))
+        lines.append("TimeLeft %d" %(int(self.timeLimit - self.t),))
+
         lines.append("Resource %d" %(len(resourceInfos),))
         for info in resourceInfos:
             lines.append("%s" % info.to_rawstr())
+
         lines.append("Ship %d" %(len(shipInfos),))
         for info in shipInfos:
             lines.append("%s" % info.to_rawstr())
@@ -267,6 +263,8 @@ class Shippo:
 
         self.statusBoard.update()
         screen.blit(self.statusBoard.image, self.statusBoard.rect)
+        self.informBoard.update()
+        screen.blit(self.informBoard.image, self.informBoard.rect)
 
         # draw UI sprites
         for sp in self.UISprites:
@@ -286,8 +284,50 @@ class Shippo:
 
     def inform(self, msg):
         print msg
+        self.informBoard.append_info(msg)
+
+    def show_menu(self):
+        from menu import Menu
+        import Tkinter as tk
+
+        root = tk.Tk()
+        self.add_human = 0
+        self.goOn = 0
+        def set_AI_vs_human():
+            self.add_human = 1
+            root.quit()
+            self.goOn = 1
+
+        def set_AI_vs_AI():
+            root.quit()
+            self.goOn = 1
+
+        def quit():
+            root.quit()
+
+        items = [('AI vs Human',set_AI_vs_human), ('AI vs AI',set_AI_vs_AI), ('Quit',quit)]
+        menu = Menu(root, items)
+        menu.pack()
+        root.mainloop()
+        if not self.goOn: self.quit()
+        else: del self.goOn
+
+    def init_graphic(self):
+        pygame.display.init()
+        self.screen = pygame.display.set_mode((self.W, self.H), pygame.DOUBLEBUF, 32)
+        pygame.display.set_caption('MSRA2012 Python version')
+        self.viewBox = ViewBox((self.W, self.H))
+
+    def render_connection(self):
+        self.screen.fill(self.SeaColor)
+        self.screen.blit(self.informBoard.image, self.informBoard.rect)
+        pygame.display.flip()
 
     def wait_connect(self):
+        if self.needQuit: return
+        self.init_graphic()
+        self.informBoard = dashboard.InformBoard((10, 25), 15)
+
         test = 0
         server = Socket(socket.AF_INET, socket.SOCK_STREAM)
         if not test:
@@ -296,7 +336,8 @@ class Shippo:
                     server.bind(('', config.Port))
                     break
                 except socket.error as e:
-                    print e
+                    self.inform(str(e))
+                    self.render_connection()
                     sleep(1)
             server.listen(2)
             server.settimeout(0.0)
@@ -304,8 +345,14 @@ class Shippo:
             player1 = Player(1, server)
         else:
             player1 = HumanPlayer(1)
-        player2 = HumanPlayer(2)
-        self.pyeventHandlers.append(player2)
+
+        if self.add_human:
+            player2 = HumanPlayer(2)
+            # add handler for human player
+            self.pyeventHandlers.append(player2)
+        else:
+            player2 = Player(2, server)
+
         players = [player1, player2, None]
 
         timer = pygame.time.Clock()
@@ -313,8 +360,8 @@ class Shippo:
         finished = 0
         player = players[finished]
         try:
+            self.inform('waiting for AI to connect...')
             while finished < 2:
-                self.inform('waiting for AI to connect...')
                 for event in pygame.event.get():
                     if event.type == QUIT:
                         self.quit()
@@ -325,8 +372,8 @@ class Shippo:
                     self.inform('AI %s connected' % (player.name))
                     finished += 1
                     player = players[finished]
-                # self.render()
-                timer.tick(20)
+                self.render_connection()
+                timer.tick(10)
         except KeyboardInterrupt:
             server.close()
             return False
@@ -337,6 +384,9 @@ class Shippo:
     def setup_level(self, level=0):
         if self.needQuit: return
         self.background = visual.Background('sea_wrap.png')
+        self.dashBoard = dashboard.DashBoard(self.BoardPos, self.BoardSize)
+        self.statusBoard = dashboard.StatusBoard()
+        self.informBoard.clear()
 
         p0 = Vec2d(250, 900)
         p1 = Vec2d(config.MapWidth - p0.x, p0.y)
@@ -452,6 +502,7 @@ class Shippo:
         def update_status():
             sec = max(int(self.timeLimit - self.t), 0)
             self.statusBoard.update_info('FPS %.1f PFPS: %.1f TIME LEFT: %02d:%02d' %(self.renderTimer.get_fps(), timer.get_fps(), sec/60, sec % 60))
+
         self.register_accumulate_callback(1.0, update_status)
 
         while not self.needQuit:

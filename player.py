@@ -41,17 +41,27 @@ class Player:
 
     def recieve_instructions(self, lock):
         # recieve all instructions sent by the AI
-        # while not self._quit:
         while 1:
             inst = self.rfile.readline()
-            # print '%s recv:[%s]'%(self.name, inst)
+            # buf = []
+            # while 1:
+            #     c = self.rfile.read(1)
+            #     if c in None:
+            #         inst = None
+            #         break
+            #     elif c != '\n':
+            #         buf.append(c)
+            #     else:
+            #         inst = ''.join(buf)
             if inst is None:
                 # connection lost
                 self.close()
                 break
             elif inst:
+                inst = inst.rstrip()
+                if config.MSGDEBUG: print '%s recv:[%s]'%(self.name, inst)
                 lock.acquire()
-                self.instructions.append(inst.rstrip())
+                self.instructions.append(inst)
                 lock.release()
             sleep(0.05)
 
@@ -96,9 +106,10 @@ class Player:
     def send_data(self, shippo):
         # call the AI's iteration
         data = '%s\n' % shippo.to_rawstr(self.faction);
-        # print 'sent:','-'*80
-        # print data
-        # print '<'*80
+        if config.MSGDEBUG:
+            print 'sent:','-'*80
+            print data
+            print '<'*80
         try:
             self.wfile.write(data)
             self.wfile.flush()

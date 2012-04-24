@@ -137,7 +137,7 @@ class ExplodeEffect(VisualEffect):
             self.kill()
 
 class BulletHit(VisualEffect):
-    Size = 5
+    Size = 15
     ExplodeSize = 30
     ExplodeT = 0.8
     def __init__(self, source, target, time):

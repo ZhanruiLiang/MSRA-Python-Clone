@@ -1,7 +1,8 @@
-/* package MSTCOSSDK; */
+package MSTCOSSDK;
 import java.net.*;
 import java.io.*;
 import java.util.Scanner;
+import MSTCOSSDK.AI;
 
 public class SDK{
     String name;

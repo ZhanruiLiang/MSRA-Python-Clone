@@ -1,4 +1,4 @@
-/* package MSTCOSSDK; */
+package MSTCOSSDK;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,11 +45,8 @@ public class AI extends AbstractAI {
 			
 			if (b.size()>0)
 			{
-				Interface.MoveTo(a.get(i).ID,
-                        b.get(k).PositionX+(float)(random.nextDouble() - 0.5) * 200f,
-                        b.get(k).PositionY+(float)(random.nextDouble() - 0.5) * 200f);
-				if (d < OSInterface.CannonRange * OSInterface.CannonRange) 
-                    Interface.Attack(a.get(i).ID, b.get(k).ID);
+				Interface.MoveTo(a.get(i).ID, b.get(k).PositionX+(float)(random.nextDouble() - 0.5) * 200f, b.get(k).PositionY+(float)(random.nextDouble() - 0.5) * 200f);
+				if (d < OSInterface.CannonRange * OSInterface.CannonRange) Interface.Attack(a.get(i).ID, b.get(k).ID);
 			}
 			else Interface.StartMoving(a.get(i).ID);
 		}
