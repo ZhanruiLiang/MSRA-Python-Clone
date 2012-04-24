@@ -18,3 +18,5 @@ MapHeight = 2048
 RangeOfView = 400.
 StopRange = 25
 StopDeccelarate = MaxSpeed ** 2 / (2 * StopRange)
+
+MSGDEBUG = 0

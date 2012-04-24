@@ -7,6 +7,8 @@ from resource import Resource
 
 pygame.font.init()
 
+Transparent = (0, 0, 0, 0)
+
 class SubBoard:
     Margin = 5
     BgColor = (0, 0, 0, 0x88)
@@ -240,7 +242,7 @@ class DashBoard:
             board.update()
             self.image.blit(board.image, board.rect)
 
-class StatsBoard:
+class StatusBoard:
     def __init__(self):
         self.info = None
         self.font = pygame.font.SysFont('monospace', 16, bold=True)
@@ -255,3 +257,46 @@ class StatsBoard:
             w, h = self.font.size(info)
             self.image = self.font.render(info, 1, Color("white"))
             self.rect = Rect((2, 2), (w, h))
+
+class InformBoard:
+    Sep = 5
+    Height = 12
+    def __init__(self, pos, maxlines=20):
+        self.infos = []
+        self.font = pygame.font.SysFont('monospace', 10, bold=True)
+        self.maxlines = maxlines
+        self.pos = pos
+        self.clear()
+
+    def update(self):
+        pass
+
+    def clear(self):
+        del self.infos[:]
+        self.image = pygame.Surface((0, 0)).convert_alpha()
+        self.rect = Rect(self.pos, (0, 0))
+
+    def append_info(self, info):
+        info = str(info)
+        w, h = self.font.size(info)
+        text = self.font.render(info, 1, Color("white"))
+        self.rect.width = max(self.rect.width, w)
+        if len(self.infos) == self.maxlines:
+            newImage = pygame.Surface(self.rect.size).convert_alpha()
+            newImage.fill(Transparent)
+            H = self.Height
+            S = self.Sep
+            newImage.blit(self.image.subsurface(
+                Rect((0, S + H), (min(self.image.get_size()[0], self.rect.width), self.rect.height - S - H))),
+                (0, 0))
+            del self.infos[0]
+        else:
+            self.rect.height += self.Height + self.Sep
+            newImage = pygame.Surface(self.rect.size).convert_alpha()
+            newImage.fill(Transparent)
+            newImage.blit(self.image, (0, 0))
+
+        newImage.blit(text, (0, self.rect.height - h))
+        self.image = newImage
+
+        self.infos.append(info)

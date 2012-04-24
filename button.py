@@ -1,5 +1,5 @@
 import pygame
-from pygame import Rect
+from pygame import Rect, Color
 from pygame.sprite import Sprite
 
 pygame.font.init()
@@ -23,14 +23,18 @@ class Button(Sprite, PyeventHandler):
         self.enable = True
         self.callbacks = {}
         self.caption = caption
+        self._mouseOver = 0
 
+        self.redraw()
+
+    def redraw(self):
+        caption = self.caption
         self.image = pygame.Surface(self.rect.size).convert_alpha()
         self.image.fill(self.BgColor)
         self.image.blit(font.render(caption, 1, (0xff, 0xff, 0xff, 0xff), self.BgColor), 
             (self.rect.size[0]/2-font.size(caption)[0]/2,
                 self.rect.size[1]/2-font.size(caption)[1]/2))
 
-        self._mouseOver = 0
 
     def bind(self, eventType, callback):
         """ 
@@ -79,3 +83,31 @@ The `callback` is a function with prototype callback(event).
 
     def __repr__(self):
         return 'Button(%s, %s)'%(self.rect, self.caption)
+
+class UIButton(Button):
+    DefaultColor = (0, 0, 0, 0x77)
+    def __init__(self, rect, caption):
+        Button.__init__(self, rect, caption, 1) # visible = 1
+        self.color = self.DefaultColor
+        self._redraw = 1
+
+        def chcolorer(color):
+            def chcolor():
+                if self.color != color:
+                    self._redraw = 1
+                self.color = color
+            return chcolor
+        self.bind(Button.Over, chcolorer(Color("yellow")))
+        self.bind(Button.Out, chcolorer((self.DefaultColor)))
+
+    def redraw(self):
+        self.image = pygame.Surface(self.rect.size).convert_alpha()
+        self.image.fill(self.color)
+        self.image.blit(font.render(caption, 1, (0xff, 0xff, 0xff, 0xff), self.color), 
+            (self.rect.size[0]/2-font.size(caption)[0]/2,
+                self.rect.size[1]/2-font.size(caption)[1]/2))
+
+    def update(self):
+        if not self._redraw: return
+        redraw()
+

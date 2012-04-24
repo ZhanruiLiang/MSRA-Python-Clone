@@ -46,7 +46,7 @@ class ShipInfo:
 class Ship(Sprite):
     color = (0, 0, 0x50, 0xff)
     FanColor = (0, 0, 0, 0xff)
-    ImgRadius = config.ShipBoundingRadius * 3
+    ImgRadius = config.ShipBoundingRadius * 2.4
     Img = None
     def __init__(self, id, faction, pos, **args):
         self.layer = 10

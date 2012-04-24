@@ -1,2 +1,9 @@
 AIGame2012/
 *.pyc
+Ocean Scream V1.1/
+SDK/java/MSTCOSSDK.bak/
+SDK/java/MSTCOSSDK.jar/
+*.swp
+*.swo
+*.class
+log

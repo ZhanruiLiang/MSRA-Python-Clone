@@ -25,7 +25,7 @@ def sprite_cmp(s1, s2):
 class Shippo:
     W = config.W
     H = config.H
-    SpeedUp = 2
+    SpeedUp = 1
     FPS = 30
     LFPS = 30 # logic frame per sec
     SeaColor = (0, 0x55, 0xff, 0xff)
@@ -295,15 +295,15 @@ class Shippo:
         self.goOn = 0
         def set_AI_vs_human():
             self.add_human = 1
-            root.quit()
+            root.destroy()
             self.goOn = 1
 
         def set_AI_vs_AI():
-            root.quit()
+            root.destroy()
             self.goOn = 1
 
         def quit():
-            root.quit()
+            root.destroy()
 
         items = [('AI vs Human',set_AI_vs_human), ('AI vs AI',set_AI_vs_AI), ('Quit',quit)]
         menu = Menu(root, items)
@@ -337,6 +337,10 @@ class Shippo:
                     break
                 except socket.error as e:
                     self.inform(str(e))
+                    for event in pygame.event.get():
+                        if event.type == QUIT:
+                            self.quit()
+                            break
                     self.render_connection()
                     sleep(1)
             server.listen(2)
@@ -471,7 +475,10 @@ class Shippo:
                 if inst is None: 
                     break
                 # apply the instruction, maybe not success
-                self.apply_instruction(inst)
+                try:
+                    self.apply_instruction(inst)
+                except Exception as e:
+                    self.inform(e)
                 done = True
 
     def mainloop(self):
